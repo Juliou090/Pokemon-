@@ -18,8 +18,8 @@ dans ce guide, on l'ajoute ici. Dans le doute sur le fait qu'elle soit « couran
 
 1. [`__init__` et `self`](#1-__init__-et-self)
 2. [Attribut privé (`_pv`)](#2-attribut-privé-_pv)
-3. [`@property` (lecture)](#3-property-lecture)
-4. [`@nom.setter` (écriture contrôlée)](#4-nomsetter-écriture-contrôlée)
+3. [Les getters `get_...` et `@property` (lecture)](#3-les-getters-get_nom-et-property-lecture)
+4. [Les setters `set_...` et `@nom.setter` (écriture contrôlée)](#4-les-setters-set_pv-et-nomsetter-écriture-contrôlée)
 5. [Exception personnalisée : `class MonErreur(Exception)`](#5-exception-personnalisée)
 6. [`raise`](#6-raise)
 7. [`try` / `except` et `assertRaises`](#7-try--except-et-assertraises)
@@ -38,6 +38,8 @@ dans ce guide, on l'ajoute ici. Dans le doute sur le fait qu'elle soit « couran
 20. [`unittest` : `TestCase`, `setUp`, `assertEqual`...](#20-unittest)
 21. [`if __name__ == "__main__":`](#21-if-__name__--__main__)
 22. [Docstring](#22-docstring)
+23. [Annotations de type (`: int`, `-> bool`, `-> None`)](#23-les-annotations-de-type--int---bool---none)
+24. [`self` : sur quel objet travaille la méthode ?](#24-self--sur-quel-objet-travaille-la-méthode-)
 
 ---
 
@@ -71,11 +73,36 @@ class Compte:
 
 **Où** : `Pokemon._pv` (`modeles/pokemon.py`), `Attaque._pp` (`modeles/attaque.py`), etc.
 
-## 3. `@property` (lecture)
+## 3. Les getters (`get_nom()`) et `@property` (lecture)
 
-**À quoi ça sert** : permet d'écrire `pokemon.nom` (sans parenthèses) alors que c'est en réalité une
-petite fonction qui renvoie l'attribut privé. Comme il n'y a pas de « setter », on ne peut pas le
-modifier de l'extérieur.
+**Le problème** : on a mis l'attribut en privé (`_nom`, avec un `_`) pour que personne ne le modifie
+n'importe comment depuis l'extérieur. Mais alors, comment les autres fichiers peuvent-ils **lire** le nom ?
+On leur fournit une méthode qui le renvoie : un **getter** (de l'anglais « get » = obtenir).
+
+**Version classique avec `get_` (celle que ton prof préfère)** :
+
+```python
+class Chien:
+    def __init__(self, nom):
+        self._nom = nom            # attribut privé : on n'y touche pas de l'extérieur
+
+    def get_nom(self):             # le getter : il RENVOIE le nom
+        return self._nom
+
+rex = Chien("Rex")
+print(rex.get_nom())               # affiche Rex  (avec des parenthèses : c'est une méthode)
+rex._nom = "Max"                   # possible techniquement, mais INTERDIT par convention (le _)
+```
+
+**À quoi ça sert, concrètement ?** Aujourd'hui `get_nom` renvoie juste `_nom`. Mais demain on pourrait
+vouloir renvoyer le nom en majuscules, ou afficher « Rex (niv. 5) » : on change UNE seule méthode, et tous
+les fichiers qui l'utilisent continuent de fonctionner sans rien changer. Si tout le monde lisait
+`_nom` directement, il faudrait modifier tout le projet.
+
+**La version raccourcie avec `@property`** (même résultat, écriture plus courte). Le `@` s'appelle un
+**décorateur** : une étiquette collée juste au-dessus d'une fonction pour dire à Python « traite cette
+fonction d'une manière spéciale ». `@property` dit : « cette méthode se lit comme un attribut, sans
+parenthèses ».
 
 ```python
 class Chien:
@@ -83,30 +110,87 @@ class Chien:
         self._nom = nom
 
     @property
-    def nom(self):
-        return self._nom         # chien.nom renvoie le nom, sans parenthèses
+    def nom(self):                 # même contenu que get_nom
+        return self._nom
+
+rex = Chien("Rex")
+print(rex.nom)                     # affiche Rex : .nom et pas .nom()
+rex.nom = "Max"                    # ERREUR : pas de setter, c'est en lecture seule
 ```
 
-**Où** : `Pokemon.nom`, `Attaque.puissance`, `TypePokemon.nom`...
+| Je veux... | Avec `get_` | Avec `@property` |
+|---|---|---|
+| lire le nom | `rex.get_nom()` | `rex.nom` |
+| définir la méthode | `def get_nom(self):` | `@property` puis `def nom(self):` |
+| risque | aucun | aucun, c'est équivalent |
 
-## 4. `@nom.setter` (écriture contrôlée)
+**Conseil** : utilise les `get_` si ton prof les préfère. Les deux sont corrects : l'important est d'avoir
+un attribut privé et un accès contrôlé.
 
-**À quoi ça sert** : s'exécute quand on écrit `objet.nom = valeur`. On y vérifie la valeur avant de
-l'accepter. C'est ce qui protège les PV.
+**Où** : dans le code de départ, `Pokemon.nom`, `Attaque.puissance`, `TypePokemon.nom`... sont écrits
+avec `@property` ; on peut les remplacer par `get_nom()`, `get_puissance()`...
+
+## 4. Les setters (`set_pv()`) et `@nom.setter` (écriture contrôlée)
+
+**Le problème** : on veut aussi pouvoir **modifier** une valeur privée (par exemple les PV), mais
+seulement si la nouvelle valeur est cohérente. On passe par une méthode qui **vérifie avant d'écrire** :
+un **setter** (de « set » = définir).
+
+**Version classique avec `set_` (celle que ton prof préfère)** :
 
 ```python
-@property
-def pv(self):
-    return self._pv
+class Pokemon:
+    def __init__(self):
+        self._pv = 100             # attribut privé
 
-@pv.setter
-def pv(self, nouvelle_valeur):
-    if nouvelle_valeur < 0:
-        raise PVInvalideError("PV négatifs")   # on refuse la valeur
-    self._pv = nouvelle_valeur                 # sinon on l'accepte
+    def get_pv(self):              # lire
+        return self._pv
+
+    def set_pv(self, nouvelle_valeur):   # écrire, AVEC vérification
+        if nouvelle_valeur < 0:
+            raise PVInvalideError("PV négatifs")   # on refuse la valeur
+        self._pv = nouvelle_valeur                 # sinon on l'accepte
+
+p = Pokemon()
+p.set_pv(50)                       # accepté
+p.set_pv(-3)                       # lève PVInvalideError : la valeur est refusée
+print(p.get_pv())                  # 50 : les PV n'ont pas été abîmés
 ```
 
-**Où** : `Pokemon.pv` dans `modeles/pokemon.py`.
+Sans le setter, n'importe quel bout de code pourrait écrire `p._pv = -3` et le Pokémon aurait des PV
+absurdes sans que personne s'en aperçoive. Le setter est le **gardien** de la valeur.
+
+**La version raccourcie avec `@nom.setter`** (même résultat). Il faut DEUX morceaux qui portent le
+**même nom** : le `@property` (lire) et le `@pv.setter` (écrire). On écrit ensuite `p.pv = 50` (un simple
+`=`), et Python appelle automatiquement le setter.
+
+```python
+class Pokemon:
+    def __init__(self):
+        self._pv = 100
+
+    @property
+    def pv(self):                  # lire : print(p.pv)
+        return self._pv
+
+    @pv.setter
+    def pv(self, nouvelle_valeur): # écrire : p.pv = 50
+        if nouvelle_valeur < 0:
+            raise PVInvalideError("PV négatifs")
+        self._pv = nouvelle_valeur
+
+p = Pokemon()
+p.pv = 50                          # appelle le setter : accepté
+p.pv = -3                          # le setter lève PVInvalideError
+```
+
+| Je veux... | Avec `get_` / `set_` | Avec `@property` / `@pv.setter` |
+|---|---|---|
+| lire les PV | `p.get_pv()` | `p.pv` |
+| changer les PV | `p.set_pv(50)` | `p.pv = 50` |
+| vérifier la valeur | dans `set_pv` | dans le `@pv.setter` |
+
+**Où** : les PV de `Pokemon` dans `modeles/pokemon.py`.
 
 ## 5. Exception personnalisée
 
@@ -175,40 +259,84 @@ exceptions héritent de `SimulateurError`.
 
 ## 9. Classe abstraite : `ABC` et `@abstractmethod`
 
-**À quoi ça sert** : une classe abstraite est un « modèle » qu'on ne peut pas créer directement. Elle
-impose à ses classes filles d'écrire certaines méthodes (celles marquées `@abstractmethod`).
+**À quoi ça sert** : une classe abstraite est un **modèle** qu'on ne peut pas créer directement. Elle
+impose à ses classes filles d'écrire certaines méthodes (celles marquées `@abstractmethod`). Si une
+fille oublie une méthode, Python refuse de la créer et affiche une erreur : on est prévenu tout de suite.
 
 ```python
 from abc import ABC, abstractmethod
 
-class Forme(ABC):
+class Forme(ABC):                       # ABC : « classe abstraite »
     @abstractmethod
     def aire(self):
         """Chaque forme doit calculer son aire."""
 
 class Carre(Forme):
-    def aire(self):              # obligatoire, sinon on ne peut pas créer un Carre
-        return 4
+    def __init__(self, cote):
+        self._cote = cote
+    def aire(self):                     # obligatoire, sinon erreur
+        return self._cote * self._cote
+
+class Rond(Forme):
+    pass                                # on a OUBLIÉ aire()
+
+forme = Forme()                         # ERREUR : on ne crée pas une classe abstraite
+rond = Rond()                           # ERREUR : Rond n'a pas défini aire()
+carre = Carre(3)                        # OK
 ```
 
-**Où** : `StatutMajeur` (`modeles/statuts.py`) et `EffetAttaque` (`modeles/effet.py`).
+**Pourquoi c'est utile (polymorphisme)** : on est sûr que TOUTES les formes ont une méthode `aire()`.
+Le reste du programme peut donc les traiter pareil, sans savoir de quelle forme il s'agit :
+
+```python
+for forme in [Carre(3), Cercle(2)]:
+    print(forme.aire())                 # chacune calcule à SA façon
+```
+
+Dans le projet : le combat appelle `statut.peut_agir()` ou `objet.utiliser()` sans se demander s'il a
+affaire à une paralysie ou à une potion.
+
+**Où** : `StatutMajeur` (`modeles/statuts.py`), `EffetAttaque` (`modeles/effet.py`), `Objet`
+(`objets/objet.py`), `Action` (`combat/actions.py`), `ModeSelection` (`modes/mode_selection.py`).
 
 ## 10. `@staticmethod`
 
-**À quoi ça sert** : une méthode rangée dans une classe mais qui n'a pas besoin d'un objet (pas de
-`self`). On l'appelle directement avec le nom de la classe.
+**À quoi ça sert** : une méthode rangée dans une classe, mais qui n'a **besoin d'aucun objet** : elle
+n'utilise aucun `self`. On l'appelle directement avec le nom de la classe, sans créer d'objet.
+
+**Sans `@staticmethod`**, il faut d'abord créer un objet, même s'il ne sert à rien :
+
+```python
+class Outils:
+    def double(self, nombre):           # self est là, mais jamais utilisé
+        return nombre * 2
+
+outils = Outils()                       # obligé de créer un objet...
+print(outils.double(4))                 # ...pour pouvoir appeler la méthode : 8
+```
+
+**Avec `@staticmethod`**, plus de `self` et plus d'objet à créer :
 
 ```python
 class Outils:
     @staticmethod
-    def double(nombre):
+    def double(nombre):                 # pas de self
         return nombre * 2
 
-Outils.double(4)                 # renvoie 8, sans créer d'objet
+print(Outils.double(4))                 # on appelle avec le nom de la classe : 8
 ```
 
+**Pourquoi la ranger dans une classe plutôt que de faire une simple fonction ?** Pour le rangement : le
+calcul des stats appartient logiquement à `Statistiques`, mais il n'a pas besoin d'un Pokémon précis,
+juste de nombres. Même idée pour `Nature.neutre()` qui fabrique une nature sans avoir besoin d'une
+nature existante.
+
+**Règle simple** : si la méthode utilise `self._quelquechose` ou une autre méthode de l'objet, elle
+garde `self` ; sinon, c'est un `@staticmethod`.
+
 **Où** : `Statistiques.calculer`, `Statistiques.zeros`, `Statistiques.aleatoires`,
-`Statistiques.identiques` (`modeles/statistiques.py`) ; `Nature.neutre` (`modeles/nature.py`).
+`Statistiques.identiques` (`modeles/statistiques.py`) ; `Nature.neutre` (`modeles/nature.py`) ;
+tous les outils de `ui/exemples_affichage.py`.
 
 ## 11. Attribut de classe
 
@@ -381,3 +509,79 @@ def soigner(self, quantite):
 ```
 
 **Où** : toutes les classes et méthodes publiques, et en tête de chaque fichier.
+
+## 23. Les annotations de type (`: int`, `-> bool`, `-> None`)
+
+**À quoi ça sert** : ce sont des **notes pour le lecteur** (et pour l'éditeur de code), qui disent quel
+genre de valeur on attend. **Python les ignore complètement** : si on les enlève, le programme
+fonctionne exactement pareil.
+
+- `nom: str` après un paramètre veut dire « ce paramètre est un texte ».
+- `-> bool` après les parenthèses veut dire « cette fonction **renvoie** un booléen (True ou False) ».
+- `-> None` veut dire « cette fonction **ne renvoie rien** » (elle fait une action, sans résultat).
+
+```python
+def est_ko(self) -> bool:          # renvoie True ou False
+    return self._pv == 0
+
+def afficher(self, texte: str) -> None:   # reçoit un texte, ne renvoie rien
+    print(texte)
+```
+
+**Attention, deux confusions fréquentes** :
+- Dans `def __init__(self) -> None:`, le `-> None` ne parle PAS de `self` : il dit seulement que
+  `__init__` ne renvoie rien (c'est toujours le cas pour `__init__`). On n'« attend » pas que `self`
+  soit `None`.
+- La flèche ne change **rien** à l'exécution : si on écrit `-> bool` et que la fonction renvoie un
+  texte, Python ne dit rien.
+
+**Où** : dans les squelettes de départ des fichiers (non encore codés). Dans le code complet de la
+branche de démonstration, on les a enlevées pour rester au plus simple.
+
+## 24. `self` : sur quel objet travaille la méthode ?
+
+**À quoi ça sert** : `self` est l'objet **sur lequel on a appelé la méthode**. C'est lui qui permet à la
+méthode de retrouver ses données (`self._nom`) ou d'appeler ses autres méthodes (`self.autre()`).
+`self` n'apparaît pas par magie : Python le fournit tout seul.
+
+```python
+class Chien:
+    def __init__(self, nom):
+        self._nom = nom                     # self = le chien qu'on est en train de créer
+
+    def aboyer(self):
+        print(self._nom + " : Ouaf !")      # self = le chien qui aboie
+
+rex = Chien("Rex")
+medor = Chien("Médor")
+rex.aboyer()                                # Rex : Ouaf !     (ici self = rex)
+medor.aboyer()                              # Médor : Ouaf !   (ici self = medor)
+
+# Écrire rex.aboyer() revient EXACTEMENT à écrire Chien.aboyer(rex).
+# Python met l'objet qui est devant le point à la place de self.
+```
+
+**Et pour une méthode comme `lancer()` du Jeu ?** Dans `main.py`, on écrit `Jeu().lancer()` :
+1. `Jeu()` **crée un objet Jeu**. Son `__init__` range dedans un `_affichage`, une `_saisie`, des
+   `_menus` ;
+2. `.lancer()` est appelée **sur cet objet**. Dans `lancer`, `self` est donc ce Jeu-là, et
+   `self._affichage` est l'affichage rangé dedans.
+
+**Lire `self._affichage.accueil()`** de gauche à droite : `self` (le Jeu), son attribut `_affichage` (un
+objet de la classe `Affichage`), et la méthode `accueil` de cet objet. Dans `accueil`, le `self` est
+alors **l'objet Affichage** (il s'en sert pour retrouver, par exemple, la largeur des cadres).
+
+**Appeler la méthode sur la classe ou sur un objet ?**
+
+```python
+Affichage.accueil()          # ERREUR : sur la classe, il manque l'objet (le self)
+affichage = Affichage()      # on crée un objet
+affichage.accueil()          # OK : self = cet objet
+```
+
+Sur la classe, ça ne marche que pour un `@staticmethod` (voir l'entrée 10), qui n'a justement pas de `self`.
+
+**Règle simple** : une méthode a besoin de `self` quand elle utilise les données de l'objet
+(`self._xxx`) ou ses autres méthodes (`self._creer_les_dresseurs()`). Sinon, c'est un `@staticmethod`.
+
+**Où** : toutes les méthodes de toutes les classes.

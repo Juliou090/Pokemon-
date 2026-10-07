@@ -61,6 +61,7 @@ ui/                        SEUL dossier avec print() et input().
   menus.py                 Menus : menus numérotés.
   saisie.py                Saisie : lecture clavier validée.
   sprites.py               Sprite : dessins en blocs colorés — niveau 3.
+  exemples_affichage.py    Boîte à outils copiable : couleurs, cadres, barres de PV, Poké Ball.
 
 sauvegarde/
   sauvegarde.py            GestionnaireSauvegarde — niveau 3.

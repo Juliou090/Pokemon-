@@ -20,12 +20,17 @@ class Dresseur:
     """
 
     def __init__(self, nom: str, equipe: Equipe, sac: Sac) -> None:
-        pass
+        """Prépare le dresseur avec son nom, son équipe et son sac."""
+        self._nom = nom
+        self._equipe = equipe
+        self._sac = sac
+    @property
+    def nom(self) -> str: 
+        return self._nom
 
     @property
-    def nom(self) -> str: raise NotImplementedError
-    @property
-    def equipe(self) -> Equipe: raise NotImplementedError
+    def equipe(self) -> Equipe: 
+        raise NotImplementedError
     @property
     def sac(self) -> Sac: raise NotImplementedError
     @property
