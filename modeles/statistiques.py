@@ -1,27 +1,29 @@
-"""Classe Statistiques : un « paquet » de 6 valeurs nommées.
+"""Les statistiques d'un Pokémon et sa nature.
 
-Les 6 valeurs sont : PV, Attaque, Défense, Attaque Spéciale, Défense Spéciale
-et Vitesse. La même classe sert pour les stats de base, les IV, les EV et
-les stats finales d'un Pokémon.
-
-On a le droit ici : stocker les 6 valeurs et fournir la formule officielle de
-calcul des stats (source : https://www.pokepedia.fr/Statistique).
-On N'A PAS le droit : de connaître un Pokémon précis ni de faire du combat.
+Formules de la génération 3 (Poképédia, page « Statistique »).
+Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
 import random
 
 
 class Statistiques:
-    """Six valeurs numériques.
+    """Six valeurs. Je m'en sers pour les stats de base, les IV, les EV et les
+    stats finales : c'est toujours le même paquet de 6 nombres."""
 
-    Attributs publics (ce sont de simples données, sans règle à contrôler) :
-        pv, attaque, defense, attaque_speciale, defense_speciale, vitesse
-    """
+    # Les 5 stats qui peuvent monter ou baisser en combat (les PV sont à part).
+    NOMS_DE_COMBAT = ["attaque", "defense", "attaque_speciale", "defense_speciale", "vitesse"]
 
-    def __init__(self, pv, attaque, defense, attaque_speciale,
-                 defense_speciale, vitesse):
-        """Crée un paquet de 6 statistiques."""
+    # Pour les messages : « L'Attaque Spéciale de X monte ! ».
+    NOMS_FRANCAIS = {
+        "attaque": "L'Attaque",
+        "defense": "La Défense",
+        "attaque_speciale": "L'Attaque Spéciale",
+        "defense_speciale": "La Défense Spéciale",
+        "vitesse": "La Vitesse",
+    }
+
+    def __init__(self, pv, attaque, defense, attaque_speciale, defense_speciale, vitesse):
         self.pv = pv
         self.attaque = attaque
         self.defense = defense
@@ -30,108 +32,56 @@ class Statistiques:
         self.vitesse = vitesse
 
     def valeur(self, nom_stat):
-        """Renvoie la valeur d'une stat à partir de son nom (ex. "vitesse")."""
-        if nom_stat == "pv":
-            return self.pv
-
-        if nom_stat == "attaque":
-            return self.attaque
-
-        if nom_stat == "defense":
-            return self.defense
-
-        if nom_stat == "attaque_speciale":
-            return self.attaque_speciale
-
-        if nom_stat == "defense_speciale":
-            return self.defense_speciale
-
-        if nom_stat == "vitesse":
-            return self.vitesse
-
-        raise ValueError("Statistique inconnue : " + str(nom_stat))
-
-    @staticmethod
-    def zeros():
-        """Renvoie des statistiques toutes à 0 (utile pour les EV par défaut)."""
-        return Statistiques(0, 0, 0, 0, 0, 0)
-
-    @staticmethod
-    def aleatoires():
-        """Renvoie des IV tirés au hasard : chaque valeur est entre 0 et 31."""
-        pv = random.randint(0, 31)
-        attaque = random.randint(0, 31)
-        defense = random.randint(0, 31)
-        attaque_speciale = random.randint(0, 31)
-        defense_speciale = random.randint(0, 31)
-        vitesse = random.randint(0, 31)
-
-        return Statistiques(pv, attaque, defense, attaque_speciale,
-                            defense_speciale, vitesse)
+        """valeur("vitesse") donne self.vitesse (getattr = lire un attribut dont le
+        nom est dans une variable)."""
+        return getattr(self, nom_stat)
 
     @staticmethod
     def identiques(valeur):
-        """Renvoie des statistiques où les 6 valeurs sont égales (ex. IV tous à 31)."""
+        """Six fois la même valeur (ex. IV tous à 31, EV tous à 0)."""
         return Statistiques(valeur, valeur, valeur, valeur, valeur, valeur)
 
     @staticmethod
+    def aleatoires():
+        """Des IV tirés au hasard entre 0 et 31."""
+        return Statistiques(random.randint(0, 31), random.randint(0, 31),
+                            random.randint(0, 31), random.randint(0, 31),
+                            random.randint(0, 31), random.randint(0, 31))
+
+    @staticmethod
     def calculer(base, iv, ev, niveau, nature):
-        """Calcule les stats finales d'un Pokémon (formule de la génération 3).
+        """Stats finales.
 
-        base, iv, ev : des objets Statistiques.
-        niveau : entier de 1 à 100.
-        nature : un objet Nature.
+        PV      = ((2*B + IV + EV//4) * N // 100) + N + 10
+        autres  = (((2*B + IV + EV//4) * N // 100) + 5) * nature
+        Je travaille en entiers (// et pourcentage 90/100/110) pour retomber
+        exactement sur les valeurs du jeu, sans erreur d'arrondi.
         """
-        pv_final = Statistiques._calculer_pv(base.pv, iv.pv, ev.pv, niveau)
+        stats = Statistiques.identiques(0)
+        stats.pv = (2 * base.pv + iv.pv + ev.pv // 4) * niveau // 100 + niveau + 10
 
-        attaque_finale = Statistiques._calculer_autre_stat(
-            base.attaque, iv.attaque, ev.attaque, niveau,
-            nature.pourcentage("attaque"))
+        for nom in Statistiques.NOMS_DE_COMBAT:
+            somme = 2 * base.valeur(nom) + iv.valeur(nom) + ev.valeur(nom) // 4
+            valeur = somme * niveau // 100 + 5
+            setattr(stats, nom, valeur * nature.pourcentage(nom) // 100)
 
-        defense_finale = Statistiques._calculer_autre_stat(
-            base.defense, iv.defense, ev.defense, niveau,
-            nature.pourcentage("defense"))
+        return stats
 
-        attaque_speciale_finale = Statistiques._calculer_autre_stat(
-            base.attaque_speciale, iv.attaque_speciale, ev.attaque_speciale,
-            niveau, nature.pourcentage("attaque_speciale"))
 
-        defense_speciale_finale = Statistiques._calculer_autre_stat(
-            base.defense_speciale, iv.defense_speciale, ev.defense_speciale,
-            niveau, nature.pourcentage("defense_speciale"))
+class Nature:
+    """+10 % sur une stat, -10 % sur une autre (ou neutre : None, None)."""
 
-        vitesse_finale = Statistiques._calculer_autre_stat(
-            base.vitesse, iv.vitesse, ev.vitesse, niveau,
-            nature.pourcentage("vitesse"))
+    def __init__(self, nom, stat_plus, stat_moins):
+        self.nom = nom
+        self.stat_plus = stat_plus
+        self.stat_moins = stat_moins
 
-        return Statistiques(pv_final, attaque_finale, defense_finale,
-                            attaque_speciale_finale, defense_speciale_finale,
-                            vitesse_finale)
+    def pourcentage(self, nom_stat):
+        """110, 90 ou 100."""
+        if nom_stat == self.stat_plus:
+            return 110
 
-    @staticmethod
-    def _calculer_pv(base, iv, ev, niveau):
-        """PV = ((2*B + IV + EV//4) * N // 100) + N + 10."""
-        # EV // 4 : division entière (on garde la partie entière, comme le jeu).
-        somme = 2 * base + iv + ev // 4
-        pv = somme * niveau // 100 + niveau + 10
+        if nom_stat == self.stat_moins:
+            return 90
 
-        return pv
-
-    @staticmethod
-    def _calculer_autre_stat(base, iv, ev, niveau, pourcentage_nature):
-        """Autre stat = (((2*B + IV + EV//4) * N // 100) + 5) * nature.
-
-        pourcentage_nature vaut 110, 100 ou 90. On travaille avec des entiers
-        (et non 1.1 ou 0.9) pour éviter les erreurs d'arrondi des décimaux.
-        """
-        somme = 2 * base + iv + ev // 4
-        valeur_sans_nature = somme * niveau // 100 + 5
-        valeur_finale = valeur_sans_nature * pourcentage_nature // 100
-
-        return valeur_finale
-
-    def __str__(self):
-        """Texte affiché quand on fait print(statistiques)."""
-        return (f"PV {self.pv} / Att {self.attaque} / Déf {self.defense} / "
-                f"AttSpé {self.attaque_speciale} / "
-                f"DéfSpé {self.defense_speciale} / Vit {self.vitesse}")
+        return 100

@@ -1,7 +1,5 @@
-"""Point d'entrée du programme.
-
-On a le droit d'ici : créer un objet Jeu et appeler sa méthode lancer().
-On N'A PAS le droit : d'écrire de la logique (pas de if/boucle/calcul métier).
+"""Point d'entrée : on crée un Jeu et on le lance. Toute la logique est dans jeu.py.
+Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
 from jeu import Jeu

@@ -1,179 +1,246 @@
-"""Classe Combat : déroule le combat tour par tour entre deux Dresseurs.
+"""Le combat tour par tour entre deux dresseurs.
 
-On a le droit ici : la boucle de combat, la collecte des actions, leur exécution dans le bon ordre,
-l'application des effets de fin de tour, le test de fin de combat.
-On N'A PAS le droit : de print (on appelle l'objet Affichage reçu), de calculer les dégâts (calcul_degats.py),
-ni de connaître le détail d'une attaque ou d'un objet précis.
+Charlotte a écrit la première version de cette classe : j'ai gardé sa structure
+(lancer, _jouer_tour, _demander_action, _fin_de_tour, _remplacer_ko,
+est_termine, vainqueur). Je l'ai complétée pour qu'elle marche avec le reste
+du jeu (voir le détail dans les commentaires « Charlotte » plus bas).
+
+Un tour se passe en 4 temps :
+    1. chaque joueur choisit son action ;
+    2. les actions sont classées (priorité, puis vitesse) et exécutées ;
+    3. effets de fin de tour (poison, brûlure, Restes...) ;
+    4. les Pokémon K.O. sont remplacés.
+Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
-from combat.actions import (
-    Action,
-    ActionAbandon,
-    ActionAttaque,
-    ActionChangement,
-    ActionObjet,
-)
-from combat.ordre import OrdreDesActions
-from modeles.dresseur import Dresseur
-from ui.menus import Menus
+import random
+
+from combat.actions import ActionAbandon, ActionAttaque, ActionChangement, ActionObjet
+from donnees.catalogue import Catalogue
+from exceptions import ActionInvalideError, ObjetIndisponibleError, PokemonKOError
 
 
 class Combat:
-    """Un combat entre deux dresseurs.
+    def __init__(self, dresseur1, dresseur2, affichage, menus):
+        self.dresseur1 = dresseur1
+        self.dresseur2 = dresseur2
+        self.affichage = affichage
+        self.menus = menus
+        self.numero_tour = 0
 
-    Attributs prévus :
-        # _dresseur1, _dresseur2 : Dresseur
-        # _affichage : Affichage   (reçu du Jeu)
-        # _saisie : Saisie         (reçu du Jeu)
-        # _numero_tour : int
-        # _meteo : Meteo | None    (niveau 2)
-    """
+    def lancer(self):
+        """Joue jusqu'à la fin. Renvoie le vainqueur (None en cas d'égalité)."""
+        self.affichage.messages([
+            self.dresseur1.nom + " et " + self.dresseur2.nom + " s'affrontent !",
+            self.dresseur1.nom + " envoie " + self.dresseur1.pokemon_actif().nom + " !",
+            self.dresseur2.nom + " envoie " + self.dresseur2.pokemon_actif().nom + " !",
+        ])
 
-    def __init__(self, dresseur1: Dresseur, dresseur2: Dresseur, affichage, saisie) -> None:
-        self._dresseur1 = dresseur1
-        self._dresseur2 = dresseur2
-        self._affichage = affichage
-        self._saisie = saisie
-        self._numero_tour = 1
-        self._meteo = None  # niveau 2, pas encore utilisée
-
-    def lancer(self) -> Dresseur:
-        """Boucle jusqu'à la fin ; renvoie le vainqueur."""
         while not self.est_termine():
             self._jouer_tour()
 
-            # On applique les effets de fin de tour
-            self._fin_de_tour()
+        return self.vainqueur()
 
-            # On vérifie si un Pokémon est KO et qu'il faut le remplacer
-            for dresseur in (self._dresseur1, self._dresseur2):
-                if dresseur.pokemon_actif.est_ko:
-                    self._remplacer_ko(dresseur)
+    def est_termine(self):
+        return self.dresseur1.a_perdu() or self.dresseur2.a_perdu()
 
-            # Vérification de fin de combat
+    def vainqueur(self):
+        """Le dresseur qui n'a pas perdu. None si les deux ont perdu en même temps
+        (Charlotte levait une erreur dans ce cas ; c'est possible, par exemple
+        avec deux Pokémon K.O. par le poison à la fin du même tour)."""
+        if self.dresseur1.a_perdu() and self.dresseur2.a_perdu():
+            return None
+
+        if self.dresseur1.a_perdu():
+            return self.dresseur2
+
+        return self.dresseur1
+
+    def _adversaire_de(self, dresseur):
+        if dresseur is self.dresseur1:
+            return self.dresseur2
+
+        return self.dresseur1
+
+    # ------------------------------------------------------------------
+    def _jouer_tour(self):
+        self.numero_tour = self.numero_tour + 1
+
+        action1 = self._demander_action(self.dresseur1)
+
+        # J'efface l'écran pour que le joueur 2 ne voie pas le choix du joueur 1.
+        self.affichage.effacer_ecran()
+        action2 = self._demander_action(self.dresseur2)
+        self.affichage.effacer_ecran()
+        self.affichage.separateur_tour(self.numero_tour)
+
+        for action in self._ordonner(action1, action2):
             if self.est_termine():
                 break
 
-        return self.vainqueur()
+            adversaire = self._adversaire_de(action.acteur)
+            self.affichage.messages(action.executer(adversaire))
 
-    def _demander_action(self, dresseur: Dresseur) -> Action:
-        """Utilise Menus/Saisie pour obtenir l'action choisie par ce dresseur."""
-        menus = Menus(self._saisie, self._affichage)
-        choix = menus.menu_principal(dresseur).strip()
+        if not self.est_termine():
+            self._fin_de_tour()
 
-        if choix == "1":
-            indice_attaque = menus.choisir_attaque(dresseur)
-            attaque = dresseur.pokemon_actif.attaques[indice_attaque]
-            return ActionAttaque(dresseur, attaque)
+        if not self.est_termine():
+            self._remplacer_ko()
 
-        if choix == "2":
-            indice_pokemon = menus.choisir_pokemon(dresseur)
-            return ActionChangement(dresseur, indice_pokemon)
+    def _ordonner(self, action1, action2):
+        """Priorité d'abord, puis vitesse du Pokémon, puis pile ou face."""
+        if action1.priorite != action2.priorite:
+            premiere_est_action1 = action1.priorite > action2.priorite
+        elif action1.vitesse() != action2.vitesse():
+            premiere_est_action1 = action1.vitesse() > action2.vitesse()
+        else:
+            premiere_est_action1 = random.randint(0, 1) == 0
 
-        if choix == "3":
-            nom_objet = menus.choisir_objet(dresseur)
-            indice_cible = menus.choisir_pokemon(dresseur)
-            return ActionObjet(dresseur, nom_objet, indice_cible)
+        if premiere_est_action1:
+            return [action1, action2]
 
-        if choix == "4":
-            return ActionAbandon(dresseur)
+        return [action2, action1]
 
-        raise ValueError(f"Choix d'action invalide : {choix!r}")
+    # ------------------------------------------------------------------
+    def _demander_action(self, dresseur):
+        """Redemande tant que le joueur n'a pas choisi une action valide.
 
-    def _jouer_tour(self) -> None:
-        """Collecte les 2 actions, les trie (ordre.py), les exécute, gère le fin de tour."""
-        action1 = self._demander_action(self._dresseur1)
-        action2 = self._demander_action(self._dresseur2)
+        Charlotte : son _demander_action plantait (ValueError) sur un mauvais
+        choix, et un Rappel sur un Pokémon vivant n'était pas géré. Ici chaque
+        erreur est expliquée au joueur, qui peut choisir autre chose.
+        """
+        while True:
+            self.affichage.separateur_tour(self.numero_tour)
+            self.affichage.etat_combat(self.dresseur1, self.dresseur2)
+            choix = self.menus.menu_principal(dresseur)
+            action = None
 
-        actions = [action1, action2]
-        actions_triees = OrdreDesActions().trier(actions)
+            if choix == 1:
+                action = self._choisir_attaque(dresseur)
+            elif choix == 2:
+                action = self._choisir_changement(dresseur)
+            elif choix == 3:
+                action = self._choisir_objet(dresseur)
+            elif choix == 4:
+                self.affichage.equipe_detaillee(dresseur)
+                self.menus.attendre_entree()
+            elif self.menus.confirmer(dresseur.nom + ", abandonner vraiment ?"):
+                action = ActionAbandon(dresseur)
 
-        for action in actions_triees:
-            if action.acteur is self._dresseur1:
-                adversaire = self._dresseur2
-            else:
-                adversaire = self._dresseur1
+            # None = le joueur a fait « retour » : on lui redemande.
+            if action is not None:
+                return action
 
-            messages = action.executer(adversaire, self)
-            if messages:
-                self._affichage.messages(messages)
+    def _choisir_attaque(self, dresseur):
+        pokemon = dresseur.pokemon_actif()
 
-        self._numero_tour += 1
+        # Si toutes les attaques sont à 0 PP, il utilise Lutte.
+        if not pokemon.a_encore_des_pp():
+            self.affichage.messages([pokemon.nom + " n'a plus de PP !"])
+            return ActionAttaque(dresseur, Catalogue.attaque_lutte())
 
-    def _fin_de_tour(self) -> None:
-        """Dégâts de statut, objets tenus, météo..."""
+        indice = self.menus.choisir_attaque(pokemon)
+
+        if indice == -1:
+            return None
+
+        return ActionAttaque(dresseur, pokemon.attaques[indice])
+
+    def _choisir_changement(self, dresseur):
+        while True:
+            indice = self.menus.choisir_pokemon(dresseur.equipe, "Quel Pokémon envoyer ?", True)
+
+            if indice == -1:
+                return None
+
+            try:
+                dresseur.equipe.verifier_changement(indice)
+            except (ActionInvalideError, PokemonKOError) as erreur:
+                self.affichage.erreur(str(erreur))
+                continue
+
+            return ActionChangement(dresseur, indice)
+
+    def _choisir_objet(self, dresseur):
+        while True:
+            nom_objet = self.menus.choisir_objet(dresseur)
+
+            if nom_objet == "":
+                return None
+
+            indice = self.menus.choisir_pokemon(
+                dresseur.equipe, "Sur quel Pokémon utiliser " + nom_objet + " ?", True)
+
+            if indice == -1:
+                continue
+
+            # Je vérifie tout de suite : si l'objet est inutile (Rappel sur un
+            # Pokémon vivant...), le joueur le sait et l'objet n'est pas perdu.
+            try:
+                dresseur.verifier_objet(nom_objet, dresseur.equipe.pokemons[indice])
+            except (ObjetIndisponibleError, ActionInvalideError) as erreur:
+                self.affichage.erreur(str(erreur))
+                continue
+
+            return ActionObjet(dresseur, nom_objet, indice)
+
+    # ------------------------------------------------------------------
+    def _fin_de_tour(self):
+        """Poison, brûlure et objets tenus agissent sur chaque Pokémon actif."""
         messages = []
 
-        for dresseur in (self._dresseur1, self._dresseur2):
-            pokemon = dresseur.pokemon_actif
+        for dresseur in [self.dresseur1, self.dresseur2]:
+            pokemon = dresseur.pokemon_actif()
 
-            if pokemon is None or pokemon.est_ko:
+            if pokemon.est_ko():
                 continue
 
             if pokemon.statut is not None:
                 degats = pokemon.statut.degats_fin_de_tour(pokemon)
+
                 if degats > 0:
                     pokemon.subir_degats(degats)
-                    messages.append(
-                        f"{pokemon.nom} perd {degats} PV à cause du statut {pokemon.statut.nom}."
-                    )
+                    messages.append(pokemon.statut.phrase_degats(pokemon) + " (-"
+                                    + str(degats) + " PV)")
 
-                message_statut = pokemon.statut.fin_de_tour(pokemon)
-                if message_statut:
-                    messages.append(message_statut)
+                    if pokemon.est_ko():
+                        messages.append(pokemon.nom + " est K.O. !")
 
             if pokemon.objet_tenu is not None:
-                message_objet = pokemon.objet_tenu.fin_de_tour(pokemon)
-                if message_objet:
-                    messages.append(message_objet)
+                phrase = pokemon.objet_tenu.fin_de_tour(pokemon)
 
-            if self._meteo is not None:
-                degats_meteo = self._meteo.fin_de_tour(pokemon)
-                if degats_meteo > 0:
-                    pokemon.subir_degats(degats_meteo)
-                    messages.append(
-                        f"{pokemon.nom} perd {degats_meteo} PV à cause de la météo {self._meteo.nom}."
-                    )
+                if phrase != "":
+                    messages.append(phrase)
 
-        if messages:
-            self._affichage.messages(messages)
+        self.affichage.messages(messages)
 
-    def _remplacer_ko(self, dresseur: Dresseur) -> None:
-        """Si le Pokémon actif est K.O., demande un remplaçant (ou fin de combat)."""
-        if not dresseur.pokemon_actif.est_ko:
-            return
+    def _remplacer_ko(self):
+        """Chaque dresseur dont le Pokémon est K.O. en envoie un autre."""
+        for dresseur in [self.dresseur1, self.dresseur2]:
+            if dresseur.a_perdu() or not dresseur.pokemon_actif().est_ko():
+                continue
 
-        if dresseur.equipe.est_vaincue():
-            dresseur.abandonner()
-            return
+            vivants = dresseur.equipe.vivants()
 
-        menus = Menus(self._saisie, self._affichage)
-        indice = menus.choisir_pokemon(dresseur)
-        dresseur.equipe.changer_actif(indice)
+            # S'il ne reste qu'un Pokémon vivant, je n'ai pas besoin de demander.
+            if len(vivants) == 1:
+                indice = dresseur.equipe.pokemons.index(vivants[0])
+            else:
+                indice = self._demander_remplacant(dresseur)
 
-    def est_termine(self) -> bool:
-        """Le combat est terminé si un dresseur a perdu ou abandonné."""
-        return (
-            self._dresseur1.a_perdu()
-            or self._dresseur2.a_perdu()
-            or self._dresseur1.equipe.est_vaincue()
-            or self._dresseur2.equipe.est_vaincue()
-        )
+            nouveau = dresseur.equipe.changer_actif(indice)
+            self.affichage.messages([dresseur.nom + " envoie " + nouveau.nom + " !"])
 
-    def vainqueur(self) -> Dresseur:
-        """Renvoie le dresseur gagnant, ou lève une erreur si le combat n'est pas terminé."""
-        dresseur1_a_perdu = self._dresseur1.a_perdu() or self._dresseur1.equipe.est_vaincue()
-        dresseur2_a_perdu = self._dresseur2.a_perdu() or self._dresseur2.equipe.est_vaincue()
+    def _demander_remplacant(self, dresseur):
+        while True:
+            indice = self.menus.choisir_pokemon(
+                dresseur.equipe, dresseur.nom + ", quel Pokémon envoyer ?", False)
 
-        if dresseur1_a_perdu and dresseur2_a_perdu:
-            raise ValueError("Les deux dresseurs ont perdu : aucun vainqueur possible.")
+            try:
+                dresseur.equipe.verifier_changement(indice)
+            except (ActionInvalideError, PokemonKOError) as erreur:
+                self.affichage.erreur(str(erreur))
+                continue
 
-        if dresseur1_a_perdu:
-            return self._dresseur2
-
-        if dresseur2_a_perdu:
-            return self._dresseur1
-
-        raise ValueError("Le combat n'est pas terminé : aucun vainqueur ne peut être déterminé.")
-        
+            return indice
 

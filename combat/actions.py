@@ -1,84 +1,185 @@
-"""Les actions possibles pendant un tour (classe abstraite Action + 4 sous-classes).
+"""Les quatre actions possibles à chaque tour : attaquer, changer de Pokémon,
+utiliser un objet, abandonner.
 
-On a le droit ici : décrire UNE décision d'un dresseur et savoir l'exécuter (polymorphisme).
-On N'A PAS le droit : de demander quoi que ce soit au joueur (saisie) ni de print.
-Pour une nouvelle action (ex. objet spécial) : nouvelle sous-classe ici.
+Choix : une classe Action « de base » et une classe fille par action. Chacune
+a sa méthode executer(), qui renvoie la liste des phrases à afficher. Le combat
+appelle action.executer() sans savoir de quelle action il s'agit.
+Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
-from abc import ABC, abstractmethod
-
-from modeles.attaque import Attaque
-from modeles.dresseur import Dresseur
+from combat.calcul_degats import CalculDegats
+from exceptions import ActionInvalideError, ObjetIndisponibleError, PokemonKOError
 
 
-class Action(ABC):
-    """Action abstraite.
+class Action:
+    # Un changement ou un objet passe avant les attaques (priorité plus haute).
+    priorite = 0
 
-    Attributs prévus :
-        # _acteur : Dresseur
-    """
+    def __init__(self, acteur):
+        self.acteur = acteur
 
-    def __init__(self, acteur: Dresseur) -> None:
-        pass
+    def vitesse(self):
+        """Vitesse du Pokémon actif : elle départage deux actions de même priorité."""
+        return self.acteur.pokemon_actif().stat_effective("vitesse")
 
-    @property
-    def acteur(self) -> Dresseur: raise NotImplementedError
-
-    @property
-    def priorite(self) -> int:
-        """Priorité de l'action (changement/objet : +6 ; attaque : celle de l'attaque)."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def executer(self, adversaire: Dresseur, combat) -> list[str]:
-        """Exécute l'action et renvoie la liste des messages à afficher."""
+    def executer(self, adversaire):
+        return []
 
 
 class ActionAttaque(Action):
-    """Utiliser une attaque.
+    def __init__(self, acteur, attaque):
+        super().__init__(acteur)
+        self.attaque = attaque
+        self.priorite = attaque.priorite
 
-    Attributs prévus :
-        # _attaque : Attaque
-    """
+    def executer(self, adversaire):
+        messages = []
+        attaquant = self.acteur.pokemon_actif()
+        defenseur = adversaire.pokemon_actif()
 
-    def __init__(self, acteur: Dresseur, attaque: Attaque) -> None:
-        pass
+        # Un Pokémon mis K.O. plus tôt dans le tour n'attaque pas.
+        try:
+            attaquant.verifier_peut_agir()
+        except PokemonKOError:
+            return messages
 
-    def executer(self, adversaire: Dresseur, combat) -> list[str]:
-        raise NotImplementedError
+        # Si la cible est déjà K.O. (ex. par son propre contrecoup), il n'y a rien à frapper.
+        if defenseur.est_ko():
+            return messages
+
+        # Le statut peut empêcher d'agir (sommeil, paralysie, gel).
+        statut = attaquant.statut
+        if statut is not None:
+            peut_agir = statut.peut_agir(attaquant)
+
+            if statut.message != "":
+                messages.append(statut.message)
+
+            if not peut_agir:
+                return messages
+
+        try:
+            self.attaque.utiliser_pp()
+        except ActionInvalideError as erreur:
+            return messages + [str(erreur)]
+
+        messages.append("[" + self.acteur.nom + "] " + attaquant.nom
+                        + " utilise " + self.attaque.nom + " !")
+
+        if not CalculDegats.touche(self.attaque):
+            messages.append("L'attaque de " + attaquant.nom + " rate !")
+        elif self.attaque.est_de_statut():
+            self._attaque_de_statut(attaquant, defenseur, messages)
+        else:
+            self._attaque_qui_blesse(attaquant, defenseur, messages)
+
+        return messages
+
+    def _attaque_de_statut(self, attaquant, defenseur, messages):
+        """Pas de dégâts : on applique les effets, et on dit si rien n'a marché."""
+        un_effet_a_marche = False
+
+        for effet in self.attaque.effets:
+            phrase = effet.appliquer(attaquant, defenseur)
+
+            if phrase != "":
+                messages.append(phrase)
+                un_effet_a_marche = True
+
+        if not un_effet_a_marche:
+            messages.append("Mais ça échoue !")
+
+    def _attaque_qui_blesse(self, attaquant, defenseur, messages):
+        resultat = CalculDegats.calculer(attaquant, defenseur, self.attaque)
+
+        if resultat.efficacite == 0.0:
+            messages.append("Ça n'affecte pas " + defenseur.nom + "...")
+            return
+
+        reels = defenseur.subir_degats(resultat.degats)
+
+        if resultat.critique:
+            messages.append("Coup critique !")
+
+        if resultat.efficacite > 1.0:
+            messages.append("C'est super efficace !")
+        elif resultat.efficacite < 1.0:
+            messages.append("Ce n'est pas très efficace...")
+
+        messages.append(defenseur.nom + " perd " + str(reels) + " PV ("
+                        + str(defenseur.get_pv()) + "/" + str(defenseur.pv_max) + ").")
+
+        if defenseur.est_ko():
+            messages.append(defenseur.nom + " est K.O. !")
+
+        # Génération 3 : une attaque de type Feu dégèle le Pokémon touché.
+        if (self.attaque.type.nom == "Feu" and defenseur.statut is not None
+                and defenseur.statut.identifiant == "gel" and not defenseur.est_ko()):
+            defenseur.statut = None
+            messages.append(defenseur.nom + " dégèle !")
+
+        # Effets secondaires (ex. 10 % de brûlure).
+        for effet in self.attaque.effets:
+            phrase = effet.appliquer(attaquant, defenseur)
+
+            if phrase != "":
+                messages.append(phrase)
+
+        # Lutte : le lanceur perd 1/4 des dégâts qu'il inflige.
+        if self.attaque.lutte and reels > 0:
+            recul = max(1, reels // 4)
+            attaquant.subir_degats(recul)
+            messages.append(attaquant.nom + " est blessé par le contrecoup (-"
+                            + str(recul) + " PV).")
+
+            if attaquant.est_ko():
+                messages.append(attaquant.nom + " est K.O. !")
 
 
 class ActionChangement(Action):
-    """Changer de Pokémon.
+    priorite = 6
 
-    Attributs prévus :
-        # _indice : int
-    """
+    def __init__(self, acteur, indice):
+        super().__init__(acteur)
+        self.indice = indice
 
-    def __init__(self, acteur: Dresseur, indice: int) -> None:
-        pass
+    def executer(self, adversaire):
+        ancien = self.acteur.pokemon_actif()
 
-    def executer(self, adversaire: Dresseur, combat) -> list[str]:
-        raise NotImplementedError
+        try:
+            nouveau = self.acteur.equipe.changer_actif(self.indice)
+        except (ActionInvalideError, PokemonKOError) as erreur:
+            return ["Changement impossible : " + str(erreur)]
+
+        return [self.acteur.nom + " rappelle " + ancien.nom + " et envoie " + nouveau.nom + " !"]
 
 
 class ActionObjet(Action):
-    """Utiliser un objet du sac sur un Pokémon de son équipe.
+    priorite = 6
 
-    Attributs prévus :
-        # _nom_objet : str
-        # _indice_cible : int
-    """
+    def __init__(self, acteur, nom_objet, indice_cible):
+        super().__init__(acteur)
+        self.nom_objet = nom_objet
+        self.indice_cible = indice_cible
 
-    def __init__(self, acteur: Dresseur, nom_objet: str, indice_cible: int) -> None:
-        pass
+    def executer(self, adversaire):
+        cible = self.acteur.equipe.pokemons[self.indice_cible]
 
-    def executer(self, adversaire: Dresseur, combat) -> list[str]:
-        raise NotImplementedError
+        try:
+            phrase = self.acteur.utiliser_objet(self.nom_objet, cible)
+        except (ObjetIndisponibleError, ActionInvalideError, PokemonKOError) as erreur:
+            return [self.acteur.nom + " veut utiliser " + self.nom_objet
+                    + ", mais : " + str(erreur)]
+
+        annonce = self.acteur.nom + " utilise " + self.nom_objet + " sur " + cible.nom + "."
+
+        return [annonce, phrase]
 
 
 class ActionAbandon(Action):
-    """Déclarer forfait : le combat se termine, l'adversaire gagne."""
+    priorite = 10
 
-    def executer(self, adversaire: Dresseur, combat) -> list[str]:
-        raise NotImplementedError
+    def executer(self, adversaire):
+        self.acteur.a_abandonne = True
+
+        return [self.acteur.nom + " abandonne le combat !"]

@@ -1,91 +1,163 @@
-"""Statuts majeurs : une classe abstraite StatutMajeur et une classe par statut.
+"""Les 5 statuts majeurs (règles de la génération 3, Bulbapedia).
 
-Un Pokémon possède au plus UN statut majeur à la fois (poison, paralysie,
-brûlure, sommeil ou gel).
-
-On a le droit ici : décrire ce qu'un statut change (empêcher d'agir, dégâts en
-fin de tour, modifier une stat). Chaque statut redéfinit les mêmes méthodes
-(polymorphisme).
-On N'A PAS le droit : de faire un print, ni de connaître le Combat.
-Pour ajouter un statut : créer une nouvelle sous-classe ici.
-Ce fichier est dans modeles/ (et non combat/) car un Pokémon POSSÈDE un statut.
-
-Pour l'instant seul le nom de chaque statut est écrit : les effets en combat
-seront codés plus tard.
+Choix : une classe « de base » StatutMajeur qui ne fait rien, et une classe par
+statut qui redéfinit seulement ce qui change. Le combat appelle toujours les
+mêmes méthodes (peut_agir, degats_fin_de_tour...) sans savoir de quel statut
+il s'agit : c'est le polymorphisme.
+Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
-from abc import ABC, abstractmethod
+import random
 
 
-class StatutMajeur(ABC):
-    """Statut abstrait : on ne crée jamais un StatutMajeur directement."""
+class StatutMajeur:
+    nom = ""
+    identifiant = ""
+    abreviation = ""
 
-    @property
-    @abstractmethod
-    def nom(self):
-        """Nom affichable du statut (ex. "empoisonné")."""
+    def __init__(self):
+        # peut_agir() y laisse une phrase à afficher (ex. « X est paralysé ! »).
+        self.message = ""
+
+    def immunise(self, pokemon):
+        """True si ce Pokémon ne peut pas avoir ce statut."""
+        return False
 
     def peut_agir(self, pokemon):
-        """Dit si le Pokémon peut agir ce tour-ci (à écrire plus tard)."""
-        raise NotImplementedError
+        self.message = ""
+        return True
 
     def degats_fin_de_tour(self, pokemon):
-        """PV perdus en fin de tour (à écrire plus tard)."""
-        raise NotImplementedError
+        return 0
 
-    def multiplicateur_stat(self, nom_stat):
-        """Modifie une stat, ex. paralysie : vitesse / 4 (à écrire plus tard)."""
-        raise NotImplementedError
+    def phrase_degats(self, pokemon):
+        return ""
 
-    def fin_de_tour(self, pokemon):
-        """Mise à jour en fin de tour, ex. décompte du sommeil (plus tard)."""
-        raise NotImplementedError
+    def pourcentage_stat(self, nom_stat):
+        """100 = la stat ne change pas."""
+        return 100
 
-    def __str__(self):
-        """Texte affiché quand on fait print(statut)."""
-        return self.nom
+    def un_huitieme(self, pokemon):
+        """1/8 des PV max, au moins 1 (poison et brûlure)."""
+        degats = pokemon.pv_max // 8
+
+        if degats < 1:
+            degats = 1
+
+        return degats
 
 
 class Poison(StatutMajeur):
-    """Perd 1/8 des PV max à chaque fin de tour."""
+    nom = "empoisonné"
+    identifiant = "poison"
+    abreviation = "PSN"
 
-    @property
-    def nom(self):
-        """Nom du statut."""
-        return "empoisonné"
+    def immunise(self, pokemon):
+        return pokemon.a_le_type("Poison")
 
+    def degats_fin_de_tour(self, pokemon):
+        return self.un_huitieme(pokemon)
 
-class Paralysie(StatutMajeur):
-    """Vitesse divisée par 4 et 25 % de chances de ne pas pouvoir agir."""
-
-    @property
-    def nom(self):
-        """Nom du statut."""
-        return "paralysé"
+    def phrase_degats(self, pokemon):
+        return pokemon.nom + " souffre du poison !"
 
 
 class Brulure(StatutMajeur):
-    """Perd 1/8 des PV max par tour ; dégâts physiques infligés divisés par 2."""
+    nom = "brûlé"
+    identifiant = "brulure"
+    abreviation = "BRU"
 
-    @property
-    def nom(self):
-        """Nom du statut."""
-        return "brûlé"
+    def immunise(self, pokemon):
+        return pokemon.a_le_type("Feu")
+
+    def degats_fin_de_tour(self, pokemon):
+        return self.un_huitieme(pokemon)
+
+    def phrase_degats(self, pokemon):
+        return pokemon.nom + " souffre de sa brûlure !"
+
+
+class Paralysie(StatutMajeur):
+    nom = "paralysé"
+    identifiant = "paralysie"
+    abreviation = "PAR"
+
+    def peut_agir(self, pokemon):
+        """Une chance sur quatre d'être bloqué."""
+        self.message = ""
+
+        if random.randint(1, 4) == 1:
+            self.message = pokemon.nom + " est paralysé ! Il ne peut pas attaquer !"
+            return False
+
+        return True
+
+    def pourcentage_stat(self, nom_stat):
+        """Vitesse divisée par 4."""
+        if nom_stat == "vitesse":
+            return 25
+
+        return 100
 
 
 class Sommeil(StatutMajeur):
-    """Ne peut pas agir pendant quelques tours."""
+    nom = "endormi"
+    identifiant = "sommeil"
+    abreviation = "SOM"
 
-    @property
-    def nom(self):
-        """Nom du statut."""
-        return "endormi"
+    def __init__(self):
+        super().__init__()
+        # En génération 3, le Pokémon est bloqué de 1 à 4 tours.
+        self.tours_restants = random.randint(1, 4)
+
+    def peut_agir(self, pokemon):
+        self.message = ""
+
+        if self.tours_restants > 0:
+            self.tours_restants = self.tours_restants - 1
+            self.message = pokemon.nom + " dort profondément."
+            return False
+
+        # Plus de tours à dormir : il se réveille et peut agir tout de suite.
+        pokemon.statut = None
+        self.message = pokemon.nom + " se réveille !"
+        return True
 
 
 class Gel(StatutMajeur):
-    """Ne peut pas agir ; 20 % de chances de dégeler à chaque tour."""
+    nom = "gelé"
+    identifiant = "gel"
+    abreviation = "GEL"
 
-    @property
-    def nom(self):
-        """Nom du statut."""
-        return "gelé"
+    def immunise(self, pokemon):
+        return pokemon.a_le_type("Glace")
+
+    def peut_agir(self, pokemon):
+        """20 % de chances de dégeler à chaque tour."""
+        self.message = ""
+
+        if random.randint(1, 100) <= 20:
+            pokemon.statut = None
+            self.message = pokemon.nom + " dégèle !"
+            return True
+
+        self.message = pokemon.nom + " est gelé : il ne peut pas bouger !"
+        return False
+
+
+def creer_statut(identifiant):
+    """Fabrique un statut NEUF à partir de son identifiant (chaque Pokémon touché
+    doit avoir le sien, à cause du compteur du sommeil)."""
+    if identifiant == "poison":
+        return Poison()
+
+    if identifiant == "brulure":
+        return Brulure()
+
+    if identifiant == "paralysie":
+        return Paralysie()
+
+    if identifiant == "sommeil":
+        return Sommeil()
+
+    return Gel()

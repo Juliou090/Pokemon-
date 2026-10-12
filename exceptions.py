@@ -1,38 +1,28 @@
-"""Toutes les exceptions personnalisées du projet.
-
-On a le droit ici : uniquement des classes d'exception (une ligne de docstring suffit).
-On N'A PAS le droit : de mettre de la logique, ni d'importer un autre module du projet.
-Toutes héritent de SimulateurError pour pouvoir toutes les attraper d'un coup.
+"""Nos exceptions. Elles héritent toutes de SimulateurError, ce qui permet de les
+attraper toutes d'un coup si besoin.
+Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
 
 class SimulateurError(Exception):
-    """Exception mère de toutes les erreurs du projet."""
+    """Mère de toutes nos erreurs."""
 
 
 class PokemonKOError(SimulateurError):
-    """Levée si on essaie de faire agir ou attaquer un Pokémon déjà K.O. (imposée par le prof)."""
+    """On essaie de faire agir ou attaquer un Pokémon K.O."""
 
 
 class ObjetIndisponibleError(SimulateurError):
-    """Levée si un Dresseur utilise un objet qu'il n'a pas ou plus (imposée par le prof)."""
+    """Un dresseur veut utiliser un objet qu'il n'a pas (ou plus)."""
 
 
 class PVInvalideError(SimulateurError):
-    """Levée si on affecte des PV incohérents (négatifs, supérieurs au max...) (imposée par le prof)."""
+    """On essaie de donner des PV incohérents (négatifs ou au-dessus du maximum)."""
 
 
 class ActionInvalideError(SimulateurError):
-    """Levée si une action est impossible (changer pour le Pokémon déjà actif, attaque sans PP...)."""
-
-
-class EquipeInvalideError(SimulateurError):
-    """Levée si une équipe n'a pas 3 Pokémon, ou en contient un invalide."""
+    """Action impossible : pas de PP, objet inutile, changement vers le même Pokémon..."""
 
 
 class DonneesInvalidesError(SimulateurError):
-    """Levée si un fichier JSON est introuvable, mal formé ou contient une valeur impossible."""
-
-
-class SauvegardeError(SimulateurError):
-    """Levée si une sauvegarde/un chargement échoue (niveau 3)."""
+    """Données impossibles : équipe de mauvaise taille, niveau hors limites..."""

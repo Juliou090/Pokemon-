@@ -1,256 +1,200 @@
-"""Classe Pokemon : UN Pokémon précis (niveau, PV actuels, nature, IV, attaques...).
+"""Un Pokémon précis : niveau, PV, nature, IV, attaques, statut...
 
-On a le droit ici : l'état d'un Pokémon et ce qu'il peut subir ou faire sur
-lui-même (subir des dégâts, se soigner...).
-On N'A PAS le droit : de décider de l'ordre des tours, de calculer les dégâts
-d'une attaque (combat/), ni d'afficher (ui/).
-
-Encapsulation : les PV sont PRIVÉS (_pv). On y accède par la propriété `pv`,
-dont le « setter » vérifie que la valeur est cohérente.
-
-Pour l'instant seuls la création, la lecture, les PV, les dégâts et les soins
-sont écrits. Statuts, paliers de combat et objet tenu viendront plus tard.
+Encapsulation : les PV sont privés (_pv). On les lit avec get_pv() et on les
+change avec set_pv(), qui vérifie que la valeur est cohérente. Les autres
+informations (nom, types...) ne risquent rien : je les laisse publiques pour
+ne pas écrire des dizaines de méthodes inutiles.
+Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
-from exceptions import DonneesInvalidesError
-from exceptions import PokemonKOError
-from exceptions import PVInvalideError
-from modeles.nature import Nature
-from modeles.modificateurs import ModificateursStats
-from modeles.statistiques import Statistiques
+from exceptions import (
+    ActionInvalideError,
+    DonneesInvalidesError,
+    PVInvalideError,
+    PokemonKOError,
+)
+from modeles.statistiques import Nature, Statistiques
 
 
 class Pokemon:
-    """Un Pokémon.
-
-    Attributs privés :
-        _nom : nom de l'espèce (ex. "Dracaufeu")
-        _types : liste de 1 ou 2 objets TypePokemon
-        _stats_base : objet Statistiques (stats de base de l'espèce)
-        _niveau : entier de 1 à 100
-        _nature : objet Nature
-        _iv : objet Statistiques (valeurs individuelles, de 0 à 31)
-        _ev : objet Statistiques (points d'effort, 0 par défaut)
-        _stats : objet Statistiques (stats finales calculées)
-        _pv : PV actuels (PRIVÉ, entre 0 et _stats.pv)
-        _attaques : liste de 1 à 4 objets Attaque
-        _statut : objet StatutMajeur, ou None s'il n'y en a pas
-        _modificateurs : objet ModificateursStats
-        _objet_tenu : objet Tenu, ou None
-    """
-
-    # Attributs de classe (communs à tous les Pokémon, ce ne sont pas des globales).
-    NIVEAU_MIN = 1
-    NIVEAU_MAX = 100
-    NOMBRE_ATTAQUES_MAX = 4
-
     def __init__(self, nom, types, stats_base, niveau, attaques,
-                 nature=None, iv=None, ev=None, objet_tenu=None):
-        """Crée un Pokémon et calcule ses stats finales.
-
-        nature : si None, nature neutre.
-        iv : si None, IV tirés au hasard entre 0 et 31.
-        ev : si None, EV tous à 0.
-        """
-        self._verifier_les_donnees(types, niveau, attaques)
-
-        self._nom = nom
-        self._types = types
-        self._stats_base = stats_base
-        self._niveau = niveau
-        self._attaques = attaques
-        self._objet_tenu = objet_tenu
-        self._statut = None
-        self._modificateurs = ModificateursStats()
-
-        # Valeurs par défaut : on les crée ici, pour avoir des objets neufs.
-        if nature is None:
-            self._nature = Nature.neutre()
-        else:
-            self._nature = nature
-
-        if iv is None:
-            self._iv = Statistiques.aleatoires()
-        else:
-            self._iv = iv
-
-        if ev is None:
-            self._ev = Statistiques.zeros()
-        else:
-            self._ev = ev
-
-        self._stats = Statistiques.calculer(
-            self._stats_base, self._iv, self._ev, self._niveau, self._nature)
-
-        # Un Pokémon neuf démarre avec tous ses PV.
-        self._pv = self._stats.pv
-
-    def _verifier_les_donnees(self, types, niveau, attaques):
-        """Lève DonneesInvalidesError si le Pokémon demandé est impossible."""
+                 nature=None, iv=None, objet_tenu=None):
+        """nature=None : nature neutre. iv=None : IV tirés au hasard (0 à 31)."""
         if len(types) < 1 or len(types) > 2:
             raise DonneesInvalidesError("Un Pokémon a un ou deux types.")
 
-        if niveau < Pokemon.NIVEAU_MIN or niveau > Pokemon.NIVEAU_MAX:
+        if niveau < 1 or niveau > 100:
             raise DonneesInvalidesError("Le niveau doit être entre 1 et 100.")
 
-        if len(attaques) < 1 or len(attaques) > Pokemon.NOMBRE_ATTAQUES_MAX:
+        if len(attaques) < 1 or len(attaques) > 4:
             raise DonneesInvalidesError("Un Pokémon a de 1 à 4 attaques.")
 
-    # ------------------------------------------------------------------
-    # Lecture
-    # ------------------------------------------------------------------
-    @property
-    def nom(self):
-        """Nom de l'espèce."""
-        return self._nom
+        self.nom = nom
+        self.types = types
+        self.stats_base = stats_base
+        self.niveau = niveau
+        self.attaques = attaques
+        self.objet_tenu = objet_tenu
+        self.statut = None
 
-    @property
-    def types(self):
-        """Liste des types du Pokémon (1 ou 2 objets TypePokemon)."""
-        return self._types
+        if nature is None:
+            nature = Nature("Sérieux", None, None)
 
-    @property
-    def niveau(self):
-        """Niveau du Pokémon."""
-        return self._niveau
+        if iv is None:
+            iv = Statistiques.aleatoires()
 
-    @property
-    def nature(self):
-        """Nature du Pokémon."""
-        return self._nature
+        self.nature = nature
+        self.iv = iv
+        self.stats = Statistiques.calculer(stats_base, iv, Statistiques.identiques(0),
+                                           niveau, nature)
+        self.pv_max = self.stats.pv
 
-    @property
-    def stats(self):
-        """Stats finales (objet Statistiques)."""
-        return self._stats
+        # Les paliers de stats de combat (de -6 à +6), remis à 0 quand on sort.
+        self.paliers = {}
+        for nom_stat in Statistiques.NOMS_DE_COMBAT:
+            self.paliers[nom_stat] = 0
 
-    @property
-    def attaques(self):
-        """Liste des attaques du Pokémon."""
-        return self._attaques
+        self._pv = self.pv_max
 
-    @property
-    def statut(self):
-        """Statut majeur actuel, ou None."""
-        return self._statut
-
-    @property
-    def modificateurs(self):
-        """Paliers temporaires de stats (objet ModificateursStats)."""
-        return self._modificateurs
-
-    @property
-    def objet_tenu(self):
-        """Objet tenu, ou None."""
-        return self._objet_tenu
-
-    @property
-    def pv_max(self):
-        """PV maximum."""
-        return self._stats.pv
-
-    @property
-    def est_ko(self):
-        """True si le Pokémon n'a plus de PV."""
-        return self._pv == 0
-
-    # ------------------------------------------------------------------
-    # Les PV (encapsulation)
-    # ------------------------------------------------------------------
-    @property
-    def pv(self):
-        """PV actuels (lecture)."""
+    # --- Les PV (privés) ---------------------------------------------------
+    def get_pv(self):
         return self._pv
 
-    @pv.setter
-    def pv(self, nouvelle_valeur):
-        """Affecte les PV. Lève PVInvalideError si la valeur est incohérente."""
-        if not isinstance(nouvelle_valeur, int):
-            raise PVInvalideError("Les PV doivent être un nombre entier.")
-
-        if nouvelle_valeur < 0:
+    def set_pv(self, valeur):
+        """Refuse les PV négatifs ou au-dessus du maximum (PVInvalideError)."""
+        if valeur < 0:
             raise PVInvalideError("Les PV ne peuvent pas être négatifs.")
 
-        if nouvelle_valeur > self.pv_max:
+        if valeur > self.pv_max:
             raise PVInvalideError("Les PV ne peuvent pas dépasser le maximum.")
 
-        self._pv = nouvelle_valeur
+        self._pv = valeur
 
-    # ------------------------------------------------------------------
-    # Actions sur soi
-    # ------------------------------------------------------------------
+    def est_ko(self):
+        return self._pv == 0
+
+    def a_encore_des_pp(self):
+        """True si au moins une attaque a encore des PP."""
+        for attaque in self.attaques:
+            if attaque.pp > 0:
+                return True
+
+        return False
+
+    def pourcentage_pv(self):
+        return self._pv * 100 // self.pv_max
+
     def verifier_peut_agir(self):
         """Lève PokemonKOError si le Pokémon est K.O."""
-        if self.est_ko:
-            raise PokemonKOError(self._nom + " est K.O. et ne peut pas agir.")
+        if self.est_ko():
+            raise PokemonKOError(self.nom + " est K.O. et ne peut pas agir.")
 
+    # --- Dégâts, soins ----------------------------------------------------
     def subir_degats(self, degats):
-        """Retire des PV (sans descendre sous 0) et renvoie les dégâts réels."""
-        if degats < 0:
-            raise PVInvalideError("Des dégâts ne peuvent pas être négatifs.")
+        """Retire des PV (jamais sous 0) et renvoie les dégâts réellement subis."""
+        reels = degats
 
-        pv_avant = self._pv
+        if reels > self._pv:
+            reels = self._pv
 
-        # Le Pokémon ne peut pas perdre plus de PV qu'il n'en a.
-        if degats >= pv_avant:
-            self._pv = 0
-        else:
-            self._pv = pv_avant - degats
+        self._pv = self._pv - reels
 
-        degats_reels = pv_avant - self._pv
-
-        return degats_reels
+        return reels
 
     def soigner(self, quantite):
-        """Rend des PV (sans dépasser le maximum) et renvoie les PV rendus.
-
-        Lève PokemonKOError si le Pokémon est K.O. : seul un objet de rappel
-        peut ranimer un Pokémon K.O.
-        """
+        """Rend des PV (jamais au-delà du max). Lève PokemonKOError si K.O."""
         self.verifier_peut_agir()
 
-        if quantite < 0:
-            raise PVInvalideError("Un soin ne peut pas être négatif.")
+        rendus = quantite
 
-        pv_avant = self._pv
-        pv_apres = pv_avant + quantite
+        if rendus > self.pv_max - self._pv:
+            rendus = self.pv_max - self._pv
 
-        # On plafonne au maximum.
-        if pv_apres > self.pv_max:
-            pv_apres = self.pv_max
+        self._pv = self._pv + rendus
 
-        self._pv = pv_apres
-        pv_rendus = pv_apres - pv_avant
+        return rendus
 
-        return pv_rendus
+    def ranimer(self, pourcentage):
+        """Remet un K.O. en vie avec un pourcentage de ses PV max."""
+        if not self.est_ko():
+            raise ActionInvalideError(self.nom + " n'est pas K.O.")
 
-    # ------------------------------------------------------------------
-    # À écrire plus tard (logique de combat)
-    # ------------------------------------------------------------------
-    def stat_effective(self, nom_stat):
-        """Stat finale x palier x statut x objet tenu (pour les dégâts)."""
-        raise NotImplementedError
+        self._pv = self.pv_max * pourcentage // 100
 
-    def ranimer(self, fraction):
-        """Remet un K.O. en vie avec une fraction de ses PV max (objet Rappel)."""
-        raise NotImplementedError
+        if self._pv < 1:
+            self._pv = 1
 
-    def appliquer_statut(self, statut):
-        """Donne un statut si le Pokémon n'en a pas déjà."""
-        raise NotImplementedError
-
-    def guerir_statut(self):
-        """Retire le statut majeur."""
-        raise NotImplementedError
+        return self._pv
 
     def soigner_completement(self):
-        """PV max, PP max, plus de statut, paliers à 0 (fin de combat)."""
-        raise NotImplementedError
+        """Fin de combat : PV, PP, statut et paliers remis à neuf."""
+        self._pv = self.pv_max
+        self.statut = None
 
-    def a_la_sortie_du_terrain(self):
-        """Remet les paliers à 0 quand on change de Pokémon."""
-        raise NotImplementedError
+        for nom_stat in self.paliers:
+            self.paliers[nom_stat] = 0
 
-    def __str__(self):
-        """Texte affiché quand on fait print(pokemon)."""
-        return f"{self._nom} (niv. {self._niveau})"
+        for attaque in self.attaques:
+            attaque.pp = attaque.pp_max
+
+    # --- Statut, types, stats ---------------------------------------------
+    def a_le_type(self, nom_type):
+        for type_pokemon in self.types:
+            if type_pokemon.nom == nom_type:
+                return True
+
+        return False
+
+    def appliquer_statut(self, statut):
+        """True si le statut a été donné (refusé : K.O., déjà un statut, immunité)."""
+        if self.est_ko() or self.statut is not None or statut.immunise(self):
+            return False
+
+        self.statut = statut
+        return True
+
+    def modifier_palier(self, nom_stat, variation):
+        """Change un palier (borné à -6/+6). Renvoie le changement réel."""
+        ancien = self.paliers[nom_stat]
+        nouveau = ancien + variation
+
+        if nouveau > 6:
+            nouveau = 6
+
+        if nouveau < -6:
+            nouveau = -6
+
+        self.paliers[nom_stat] = nouveau
+
+        return nouveau - ancien
+
+    def stat_effective(self, nom_stat, ignorer_baisses=False, ignorer_hausses=False):
+        """La stat utilisée en combat : stat finale x palier x statut x objet tenu.
+
+        Sur un coup critique, la génération 3 ignore les baisses de l'attaquant
+        et les hausses du défenseur : d'où les deux options.
+        """
+        valeur = self.stats.valeur(nom_stat)
+        palier = self.paliers[nom_stat]
+
+        if ignorer_baisses and palier < 0:
+            palier = 0
+
+        if ignorer_hausses and palier > 0:
+            palier = 0
+
+        if palier >= 0:
+            valeur = valeur * (2 + palier) // 2
+        else:
+            valeur = valeur * 2 // (2 - palier)
+
+        if self.statut is not None:
+            valeur = valeur * self.statut.pourcentage_stat(nom_stat) // 100
+
+        if self.objet_tenu is not None:
+            valeur = valeur * self.objet_tenu.pourcentage_stat(nom_stat) // 100
+
+        if valeur < 1:
+            valeur = 1
+
+        return valeur

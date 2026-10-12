@@ -1,118 +1,113 @@
-"""Classe Attaque : une capacité utilisable par un Pokémon (Lance-Flammes...).
-
-On a le droit ici : nom, type, puissance, précision, PP, priorité, effets.
-On N'A PAS le droit : de calculer les dégâts (c'est combat/calcul_degats.py)
-ni d'afficher quoi que ce soit.
-Une attaque est TOUJOURS un objet Attaque, jamais un dictionnaire, un tuple
-ou une liste.
+"""Une attaque, et ses effets (statut ou modification de stat).
+Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
+import random
+
 from exceptions import ActionInvalideError
+from modeles.statistiques import Statistiques
+from modeles.statuts import creer_statut
+
+
+class EffetStatut:
+    """L'attaque peut infliger un statut (ex. 10 % de brûlure)."""
+
+    def __init__(self, identifiant_statut, chance):
+        self.identifiant_statut = identifiant_statut
+        self.chance = chance
+
+    def appliquer(self, lanceur, cible):
+        """Renvoie la phrase à afficher, ou "" s'il ne s'est rien passé."""
+        if cible.est_ko():
+            return ""
+
+        if random.randint(1, 100) > self.chance:
+            return ""
+
+        statut = creer_statut(self.identifiant_statut)
+
+        if cible.appliquer_statut(statut):
+            return cible.nom + " est " + statut.nom + " !"
+
+        return ""
+
+
+class EffetStat:
+    """L'attaque monte ou baisse une stat (palier de -6 à +6)."""
+
+    def __init__(self, nom_stat, paliers, sur_soi, chance=100):
+        self.nom_stat = nom_stat
+        self.paliers = paliers
+        self.sur_soi = sur_soi
+        self.chance = chance
+
+    def appliquer(self, lanceur, cible):
+        """Renvoie la phrase à afficher, ou "" s'il ne s'est rien passé."""
+        if self.sur_soi:
+            vise = lanceur
+        else:
+            vise = cible
+
+        if vise.est_ko() or random.randint(1, 100) > self.chance:
+            return ""
+
+        changement = vise.modifier_palier(self.nom_stat, self.paliers)
+        debut = Statistiques.NOMS_FRANCAIS[self.nom_stat] + " de " + vise.nom
+
+        if changement == 0:
+            # Un effet « de chance » reste silencieux s'il ne change rien.
+            if self.chance < 100:
+                return ""
+
+            if self.paliers > 0:
+                return debut + " ne peut plus monter !"
+
+            return debut + " ne peut plus baisser !"
+
+        if changement > 0:
+            verbe = "monte"
+        else:
+            verbe = "baisse"
+
+        if abs(changement) == 2:
+            verbe = verbe + " beaucoup"
+        elif abs(changement) >= 3:
+            verbe = verbe + " énormément"
+
+        return debut + " " + verbe + " !"
 
 
 class Attaque:
-    """Une attaque.
-
-    Attributs privés :
-        _nom : nom de l'attaque
-        _type : un objet TypePokemon
-        _puissance : entier (0 pour une attaque de statut)
-        _precision : entier de 1 à 100 (0 = ne rate jamais)
-        _pp_max : nombre de PP au maximum
-        _pp : nombre de PP restants
-        _priorite : 0 normalement, +1 pour Vive-Attaque
-        _effets : liste d'objets EffetAttaque (liste vide si aucun effet)
-        _critique_eleve : True si le taux de coup critique est augmenté
-    """
-
     def __init__(self, nom, type_attaque, puissance, precision, pp_max,
-                 priorite=0, effets=None, critique_eleve=False):
-        """Crée une attaque avec tous ses PP."""
-        self._nom = nom
-        self._type = type_attaque
-        self._puissance = puissance
-        self._precision = precision
-        self._pp_max = pp_max
-        self._pp = pp_max
-        self._priorite = priorite
-        self._critique_eleve = critique_eleve
+                 priorite=0, effets=None, critique_eleve=False, lutte=False):
+        """puissance = 0 : attaque de statut. precision = 0 : ne rate jamais.
+        lutte = True : ignore les types et blesse le lanceur (attaque Lutte)."""
+        self.nom = nom
+        self.type = type_attaque
+        self.puissance = puissance
+        self.precision = precision
+        self.pp_max = pp_max
+        self.pp = pp_max
+        self.priorite = priorite
+        self.critique_eleve = critique_eleve
+        self.lutte = lutte
 
-        # On évite « effets=[] » dans la signature : cette liste serait alors
-        # partagée entre toutes les attaques. On crée une liste neuve ici.
+        # Je crée la liste ici : mettre « effets=[] » dans la signature
+        # partagerait la même liste entre toutes les attaques.
         if effets is None:
-            self._effets = []
+            self.effets = []
         else:
-            self._effets = effets
+            self.effets = effets
 
-    @property
-    def nom(self):
-        """Nom de l'attaque."""
-        return self._nom
-
-    @property
-    def type(self):
-        """Type de l'attaque (objet TypePokemon)."""
-        return self._type
-
-    @property
-    def puissance(self):
-        """Puissance (0 pour une attaque de statut)."""
-        return self._puissance
-
-    @property
-    def precision(self):
-        """Précision (0 = ne rate jamais)."""
-        return self._precision
-
-    @property
-    def pp(self):
-        """PP restants."""
-        return self._pp
-
-    @property
-    def pp_max(self):
-        """PP maximum."""
-        return self._pp_max
-
-    @property
-    def priorite(self):
-        """Priorité de l'attaque."""
-        return self._priorite
-
-    @property
-    def effets(self):
-        """Liste des effets de l'attaque (peut être vide)."""
-        return self._effets
-
-    @property
-    def critique_eleve(self):
-        """True si le taux de coup critique est augmenté."""
-        return self._critique_eleve
-
-    @property
     def est_speciale(self):
-        """True si l'attaque est spéciale.
+        return self.type.special
 
-        En génération 3, cela dépend du TYPE de l'attaque, pas de l'attaque.
-        """
-        return self._type.est_special
-
-    @property
     def est_de_statut(self):
-        """True si l'attaque n'inflige pas de dégâts (puissance égale à 0)."""
-        return self._puissance == 0
+        return self.puissance == 0
 
     def utiliser_pp(self):
-        """Retire 1 PP. Lève ActionInvalideError s'il n'en reste plus."""
-        if self._pp <= 0:
-            raise ActionInvalideError(self._nom + " n'a plus de PP.")
+        """Retire 1 PP, ou lève ActionInvalideError s'il n'y en a plus."""
+        if self.pp <= 0:
+            raise ActionInvalideError(self.nom + " n'a plus de PP.")
 
-        self._pp = self._pp - 1
-
-    def restaurer_pp(self):
-        """Remet les PP au maximum (fin de combat)."""
-        self._pp = self._pp_max
-
-    def __str__(self):
-        """Texte affiché quand on fait print(attaque)."""
-        return self._nom
+        self.pp = self.pp - 1

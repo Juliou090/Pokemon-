@@ -19,6 +19,7 @@ Comment ça marche, en résumé :
   terminal les comprend comme « colore ce qui suit ».
 - Les cadres, les barres et la Poké Ball sont fabriqués avec des caractères
   ordinaires (─ │ █ ░...) répétés avec l'opérateur * (ex. "─" * 10).
+Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
 import math
@@ -217,20 +218,6 @@ class OutilsAffichage:
             resultat.append(marge + texte)
 
         return resultat
-    @staticmethod
-    def _ligne_de_la_bande(ligne, demi_largeur):
-        """Les 3 lignes du milieu : bande grise, avec le bouton blanc au centre."""
-        largeur_bouton = 4
-
-        if ligne != 0:
-            largeur_bouton = 2
-
-        cote = demi_largeur - largeur_bouton
-        bande_gauche = OutilsAffichage.colorer("█" * cote, Couleurs.GRIS)
-        bouton = OutilsAffichage.colorer("█" * (2 * largeur_bouton), Couleurs.BLANC)
-        bande_droite = OutilsAffichage.colorer("█" * cote, Couleurs.GRIS)
-
-        return bande_gauche + bouton + bande_droite
 
     # ------------------------------------------------------------------
     # 6. Divers
