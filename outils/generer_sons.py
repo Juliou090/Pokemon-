@@ -22,7 +22,7 @@ class Synthe:
     def __init__(self):
         self.taux = 22050
 
-    def ton(self, f_debut, f_fin, duree, volume=0.5, carre=False):
+    def ton(self, f_debut, f_fin, duree, volume=0.01, carre=False):
         """Un son qui glisse de f_debut à f_fin (en Hz) et qui s'éteint peu à peu."""
         nombre = int(duree * self.taux)
         son = []
@@ -42,7 +42,7 @@ class Synthe:
 
         return son
 
-    def bruit(self, duree, volume=0.5):
+    def bruit(self, duree, volume=0.01):
         """Un souffle qui s'éteint peu à peu."""
         nombre = int(duree * self.taux)
         son = []

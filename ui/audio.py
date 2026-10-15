@@ -27,7 +27,14 @@ class Audio:
     LIENS_MUSIQUE = {"menu": "", "combat": ""}
 
     VOLUME_NORMAL = 0.01    # de 0 à 1
-    VOLUME_DISCRET = 0.2    # pendant le déroulement d'un tour, pour entendre les bruitages
+    VOLUME_DISCRET = 0.005    # pendant le déroulement d'un tour, pour entendre les bruitages
+    VOLUMES_BRUITAGES = {
+        "clic": 0.1,
+        "retour": 0.1,
+        "critique": 0.1,
+        "super_efficace": 0.2,
+        "ko": 0.2,
+    }
 
     def __init__(self, actif=True):
         """actif=False : jeu muet (tests). On peut aussi couper avec JEU_SANS_SON=1."""
@@ -104,6 +111,7 @@ class Audio:
 
         if nom not in self.bruitages:
             self.bruitages[nom] = self.pygame.mixer.Sound(chemin)
+            self.bruitages[nom].set_volume(Audio.VOLUMES_BRUITAGES.get(nom, 1.0))
 
         self.bruitages[nom].play()
 
