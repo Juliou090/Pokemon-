@@ -1,5 +1,5 @@
 """Tests des modèles : types, stats, Pokémon (PV privés), équipe, attaques, statuts.
-Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
+S'il y a un @ que l'on ne connaît pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
 import unittest
@@ -44,7 +44,7 @@ class TestTypes(unittest.TestCase):
 
 class TestStats(unittest.TestCase):
     def test_dracaufeu_niveau_50(self):
-        dracaufeu = Catalogue.pokemon(0, 50, Statistiques.identiques(31))
+        dracaufeu = Catalogue.pokemon(0, 50, Statistiques(31))
 
         self.assertEqual(dracaufeu.pv_max, 153)
         self.assertEqual(dracaufeu.stats.vitesse, 120)
@@ -52,8 +52,7 @@ class TestStats(unittest.TestCase):
     def test_nature(self):
         base = Statistiques(78, 84, 78, 109, 85, 100)
         rigide = Nature("Rigide", "attaque", "attaque_speciale")
-        stats = Statistiques.calculer(base, Statistiques.identiques(31),
-                                      Statistiques.identiques(0), 50, rigide)
+        stats = base.calculer(Statistiques(31), Statistiques(0), 50, rigide)
 
         self.assertEqual(stats.attaque, 114)
         self.assertEqual(stats.attaque_speciale, 116)
@@ -80,7 +79,7 @@ class TestStats(unittest.TestCase):
 
 class TestPokemon(unittest.TestCase):
     def setUp(self):
-        self.pokemon = Catalogue.pokemon(0, 50, Statistiques.identiques(31))
+        self.pokemon = Catalogue.pokemon(0, 50, Statistiques(31))
 
     def test_pv_invalides(self):
         with self.assertRaises(PVInvalideError):
@@ -143,7 +142,7 @@ class TestEquipeEtStatuts(unittest.TestCase):
             equipe.changer_actif(0)
 
     def test_statuts(self):
-        laggron = Catalogue.pokemon(3, 50, Statistiques.identiques(31))
+        laggron = Catalogue.pokemon(3, 50, Statistiques(31))
 
         self.assertTrue(laggron.appliquer_statut(Paralysie()))
         self.assertFalse(laggron.appliquer_statut(Poison()))

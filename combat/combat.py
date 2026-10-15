@@ -10,7 +10,7 @@ Un tour se passe en 4 temps :
     2. les actions sont classées (priorité, puis vitesse) et exécutées ;
     3. effets de fin de tour (poison, brûlure, Restes...) ;
     4. les Pokémon K.O. sont remplacés.
-Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
+S'il y a un @ que l'on ne connaît pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
 import random
@@ -18,6 +18,15 @@ import random
 from combat.actions import ActionAbandon, ActionAttaque, ActionChangement, ActionObjet
 from donnees.catalogue import Catalogue
 from exceptions import ActionInvalideError, ObjetIndisponibleError, PokemonKOError
+
+
+class ResultatDegats:
+    """Ce que renvoie Combat.calculer_degats : dégâts, efficacité totale, critique ?"""
+
+    def __init__(self, degats, efficacite, critique):
+        self.degats = degats
+        self.efficacite = efficacite
+        self.critique = critique
 
 
 class Combat:
@@ -56,6 +65,90 @@ class Combat:
 
         return self.dresseur1
 
+    # ------------------------------------------------------------------
+    # Calcul des dégâts (formule de la génération 3, Bulbapedia, page « Damage »)
+    #
+    #   dégâts = ((((2 x Niveau / 5 + 2) x Puissance x A / D) / 50) x Brûlure + 2)
+    #            x Critique x Aléatoire(85 à 100 %) x STAB x Type1 x Type2
+    #
+    # Le prof m'a conseillé de mettre ce calcul dans Combat, avec self, plutôt que
+    # dans une classe à part dont les fonctions n'auraient eu besoin d'aucun objet :
+    # c'est bien le combat qui calcule les dégâts.
+    # ------------------------------------------------------------------
+    def touche(self, attaque):
+        """Test de précision (précision 0 = ne rate jamais)."""
+        if attaque.precision == 0:
+            return True
+
+        return random.randint(1, 100) <= attaque.precision
+
+    def formule_de_base(self, niveau, puissance, valeur_attaque, valeur_defense,
+                        brule_et_physique):
+        """La partie « ((2N/5+2) x P x A/D / 50) x Brûlure + 2 » (séparée pour les tests)."""
+        degats = (2 * niveau // 5 + 2) * puissance * valeur_attaque // valeur_defense // 50
+
+        if brule_et_physique:
+            degats = degats // 2
+
+        return degats + 2
+
+    def calculer_degats(self, attaquant, defenseur, attaque):
+        """Renvoie un ResultatDegats. Toutes les divisions gardent la partie entière."""
+        if attaque.critique_eleve:
+            critique = random.randint(1, 8) == 1
+        else:
+            critique = random.randint(1, 16) == 1
+
+        if attaque.est_speciale():
+            stat_attaque = "attaque_speciale"
+            stat_defense = "defense_speciale"
+        else:
+            stat_attaque = "attaque"
+            stat_defense = "defense"
+
+        # Un coup critique ignore les baisses de l'attaquant et les hausses du défenseur.
+        valeur_attaque = attaquant.stat_effective(stat_attaque, ignorer_baisses=critique)
+        valeur_defense = defenseur.stat_effective(stat_defense, ignorer_hausses=critique)
+
+        brule_et_physique = False
+        if attaquant.statut is not None and attaquant.statut.identifiant == "brulure":
+            brule_et_physique = not attaque.est_speciale()
+
+        degats = self.formule_de_base(attaquant.niveau, attaque.puissance,
+                                      valeur_attaque, valeur_defense, brule_et_physique)
+
+        if critique:
+            degats = degats * 2
+
+        degats = degats * random.randint(85, 100) // 100
+
+        efficacite = 1.0
+
+        # Lutte ignore les types : ni STAB, ni efficacité.
+        if not attaque.lutte:
+            if attaquant.a_le_type(attaque.type.nom):
+                degats = degats * 15 // 10
+
+            efficacite = attaque.type.efficacite_contre_pokemon(defenseur.types)
+
+            # Un type après l'autre, comme dans le jeu (pour les arrondis).
+            for type_defenseur in defenseur.types:
+                multiplicateur = attaque.type.efficacite_contre(type_defenseur)
+
+                if multiplicateur == 2.0:
+                    degats = degats * 2
+                elif multiplicateur == 0.5:
+                    degats = degats // 2
+                elif multiplicateur == 0.0:
+                    degats = 0
+
+        # Une attaque qui touche fait au moins 1 dégât, sauf immunité.
+        if efficacite > 0 and degats < 1:
+            degats = 1
+
+        return ResultatDegats(degats, efficacite, critique)
+
+    # ------------------------------------------------------------------
     def _adversaire_de(self, dresseur):
         if dresseur is self.dresseur1:
             return self.dresseur2
@@ -74,12 +167,17 @@ class Combat:
         self.affichage.effacer_ecran()
         self.affichage.separateur_tour(self.numero_tour)
 
+        # La musique baisse un peu pour laisser entendre les bruitages.
+        self.affichage.musique_discrete()
+
         for action in self._ordonner(action1, action2):
             if self.est_termine():
                 break
 
             adversaire = self._adversaire_de(action.acteur)
-            self.affichage.messages(action.executer(adversaire))
+            self.affichage.messages(action.executer(adversaire, self))
+
+        self.affichage.musique_normale()
 
         if not self.est_termine():
             self._fin_de_tour()

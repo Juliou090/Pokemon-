@@ -24,9 +24,9 @@ donnees/
                            5 équipes toutes faites (une ligne « nom = Pokemon(...) » par Pokémon)
 
 combat/
-  calcul_degats.py         CalculDegats : formule de la génération 3
   actions.py               Action + ActionAttaque, ActionChangement, ActionObjet, ActionAbandon
   combat.py                Combat : la boucle tour par tour (écrit d'abord par Charlotte)
+                           + le calcul des dégâts (méthodes avec self, génération 3)
 
 modes/
   creation_equipe.py       CreationEquipe : les 4 modes de création d'équipe
@@ -34,7 +34,11 @@ modes/
 ui/                        le seul dossier qui utilise print et input
   affichage.py             Affichage : tout ce qui s'affiche
   menus.py                 Menus : questions au joueur (avec vérification)
-  exemples_affichage.py    boîte à outils : couleurs, cadres, barres de PV, Poké Ball
+  exemples_affichage.py    OutilsAffichage : couleurs, cadres, barres de PV, Poké Ball
+  audio.py                 Audio : musique de fond (avec transitions) et bruitages
+
+audio/                     musiques (.mp3) et bruitages (audio/sons/*.wav)
+outils/generer_sons.py     fabrique les bruitages (hors jeu)
 
 tests/                     tests unittest
 GUIDE_PYTHON.md            explication des syntaxes utilisées
@@ -52,8 +56,13 @@ attributs de classe.
 - **Données en objets, pas de JSON** : `Catalogue.pokemon(0)` fabrique un vrai `Pokemon`. Chaque appel
   renvoie un objet neuf (deux Dracaufeu ne partagent pas leurs PP). Pour ajouter un Pokémon ou une
   attaque, on copie une ligne `xxx = Pokemon(...)` / `xxx = Attaque(...)` dans `catalogue.py`.
-- **Le seul décorateur est `@staticmethod`** (expliqué dans `GUIDE_PYTHON.md`) ; pas de `@property`
+- **Orienté objet partout** : le calcul des dégâts est dans `Combat` (avec `self`), `Affichage`
+  hérite de `OutilsAffichage`. Seule exception assumée : `Catalogue`, qui ne fait que fabriquer les
+  données du jeu (le seul `@staticmethod`, expliqué dans `GUIDE_PYTHON.md`). Pas de `@property`
   ni de classe abstraite : des `get_` / `set_` pour les PV, et des classes mères normales.
+- **Le son avec pygame.mixer** (seulement la partie son) : MP3, volume, fondus et bruitages en
+  quelques lignes de Python. Sans pygame ou sans carte son, le jeu marche pareil, en silence.
+- **Texte lettre par lettre** : `Affichage.ecrire`, vitesse réglable avec `delai_lettre`.
 - **Les types connaissent leurs forces** : pas de tableau 14 x 14 ; `TypePokemon.efficacite_contre(...)`.
 - **Encapsulation** : les PV sont privés (`_pv`) avec `get_pv` / `set_pv` qui vérifient la valeur.
 - **Polymorphisme** : `Objet.utiliser`, `StatutMajeur.peut_agir`, `Action.executer` sont redéfinies

@@ -1,17 +1,13 @@
 """Toutes les données du jeu : types, attaques, Pokémon, natures, objets, équipes.
-Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
 
-Choix : pas de fichier JSON (consigne du prof) et pas de variable globale. Les
-données sont de simples lignes « nom = Classe(...) » à l'intérieur de méthodes
-de la classe Catalogue (ce sont des variables LOCALES, pas globales).
+Je n'ai pas utilisé de fichier JSON (consigne du prof) ni de variable globale : j'écris
+simplement des lignes « nom = Classe(...) » dans des méthodes, ce sont des variables locales.
+Pour ajouter un Pokémon, je copie une ligne « xxx = Pokemon(...) » dans _tous_les_pokemon()
+et je l'ajoute à la liste renvoyée à la fin. C'est pareil pour une attaque.
 
-Pour ajouter un Pokémon : copier une ligne « xxx = Pokemon(...) » dans
-_tous_les_pokemon() et l'ajouter à la liste renvoyée à la fin (dans l'ordre).
-Pour ajouter une attaque : copier une ligne « xxx = Attaque(...) ».
-
-Valeurs vérifiées pour la génération 3 sur PokéAPI (past_stats, past_values) et
-Bulbapedia. Exemples : Raichu a 100 de Vitesse (110 depuis la génération 6) et
-Lance-Flammes a 95 de puissance (90 aujourd'hui).
+J'ai vérifié les valeurs de la génération 3 sur PokéAPI et Bulbapedia (par exemple Raichu a
+100 de Vitesse, et Lance-Flammes 95 de puissance).
+S'il y a un @ que l'on ne connaît pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
 import random
@@ -25,6 +21,16 @@ from modeles.type_pokemon import TypePokemon
 
 
 class Catalogue:
+    """Ici, toutes les méthodes sont des @staticmethod : on n'a pas besoin de créer
+    un objet Catalogue pour s'en servir (Catalogue.pokemon(0)).
+
+    Je considère que c'est acceptable pour cette classe : elle sert seulement à
+    fabriquer d'un coup toutes les données du jeu (Pokémon, attaques, natures...),
+    comme une « usine » ou un fichier de données. Elle ne garde aucun état et il
+    n'y a aucun comportement du jeu dedans : tout le reste du programme est de
+    l'orienté objet normal (objets avec self, héritage, polymorphisme).
+    """
+
     NOMS_DES_EQUIPES = ["Trio de départ", "Tempête", "Muraille", "Poids lourds", "Mystères"]
 
     # ------------------------------------------------------------------

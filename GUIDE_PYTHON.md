@@ -53,32 +53,28 @@ print(Outils.double(4))              # 8, sans créer d'objet
 | utilise les données de l'objet (`self.nom`, `self.pv`...) ou ses autres méthodes | `self` (méthode normale) |
 | n'utilise que ses paramètres, rien de l'objet | `@staticmethod` (pas de `self`) |
 
-### Exemples dans le projet
+### Où on le trouve dans le projet
+
+Une seule classe l'utilise : `Catalogue` (`donnees/catalogue.py`). Elle sert seulement à fabriquer
+d'un coup les données du jeu (Pokémon, attaques, natures...). On l'appelle avec le nom de la classe :
 
 ```python
-# modeles/statistiques.py : le calcul des stats ne dépend d'aucun Pokémon précis,
-# juste de nombres qu'on lui donne.
-stats = Statistiques.calculer(base, iv, ev, niveau, nature)
-
-# donnees/catalogue.py : fabriquer un Pokémon n'a besoin d'aucun objet Catalogue.
-dracaufeu = Catalogue.pokemon(0)
-
-# ui/exemples_affichage.py : colorer un texte n'a besoin que du texte et de la couleur.
-print(OutilsAffichage.colorer("Attention", Couleurs.ROUGE))
+dracaufeu = Catalogue.pokemon(0)       # un Pokémon neuf, sans créer d'objet Catalogue
+natures = Catalogue.natures()
 ```
 
-Dans chaque cas, on appelle avec le **nom de la classe** (`Statistiques.`, `Catalogue.`,
-`OutilsAffichage.`) et pas avec un objet.
+Partout ailleurs, les méthodes ont `self` : le calcul des dégâts est dans `Combat`, les outils
+d'affichage sont dans `OutilsAffichage` (dont `Affichage` hérite), etc.
 
 ### Pourquoi la ranger dans une classe plutôt que d'écrire une simple fonction ?
 
-Pour le rangement : le calcul des stats appartient logiquement à `Statistiques`, la fabrication des
-Pokémon au `Catalogue`. Quand on cherche où est un calcul, on regarde dans la classe du sujet.
+Pour le rangement : la fabrication des Pokémon appartient logiquement au `Catalogue`. Quand on cherche
+où sont les données, on regarde dans cette classe.
 
 ### Erreur classique
 
 ```python
-Statistiques.calculer(...)           # OK : la méthode est un @staticmethod
+Catalogue.pokemon(0)                 # OK : la méthode est un @staticmethod
 Pokemon.get_pv()                     # ERREUR : get_pv a besoin d'un Pokémon (self), pas de @staticmethod
 dracaufeu.get_pv()                   # OK : on l'appelle sur un objet
 ```

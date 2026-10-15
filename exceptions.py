@@ -1,6 +1,8 @@
-"""Nos exceptions. Elles héritent toutes de SimulateurError, ce qui permet de les
-attraper toutes d'un coup si besoin.
-Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
+"""Mes exceptions. Elles héritent toutes de SimulateurError, comme ça je peux les attraper
+toutes d'un coup si besoin. Les trois que le sujet impose sont PokemonKOError,
+ObjetIndisponibleError et PVInvalideError ; j'ai ajouté ActionInvalideError (action
+impossible) et DonneesInvalidesError (données impossibles).
+S'il y a un @ que l'on ne connaît pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
 

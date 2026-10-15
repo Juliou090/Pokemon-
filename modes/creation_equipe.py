@@ -1,9 +1,9 @@
 """Les 4 modes de création d'équipe.
 
-Choix : une seule classe avec une méthode par mode. Chaque mode fabrique la
-liste des Pokémon (grâce à _pokemon) et choisit le sac de départ.
-Chaque mode renvoie un Dresseur prêt à combattre.
-Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
+J'ai mis les 4 modes dans une seule classe, avec une méthode par mode. Chacun fabrique la
+liste des Pokémon (avec _fabriquer), choisit le sac de départ, puis renvoie un Dresseur prêt
+à combattre.
+S'il y a un @ que l'on ne connaît pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
 import random
@@ -73,9 +73,9 @@ class CreationEquipe:
         for numero in numeros:
             niveau = random.randint(niveau_min, niveau_max)
 
-            iv = Statistiques.aleatoires()
+            iv = None
             if iv_maximaux:
-                iv = Statistiques.identiques(31)
+                iv = Statistiques(31)
 
             nature = Catalogue.nature_neutre()
             if natures_aleatoires:

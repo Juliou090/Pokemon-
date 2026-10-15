@@ -1,5 +1,5 @@
 """Tests des objets, du sac, des dégâts et du combat complet (avec des menus « robots »).
-Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
+S'il y a un @ que l'on ne connaît pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
 import contextlib
@@ -8,7 +8,6 @@ import random
 import unittest
 
 from combat.actions import ActionAttaque
-from combat.calcul_degats import CalculDegats
 from combat.combat import Combat
 from donnees.catalogue import Catalogue
 from exceptions import ActionInvalideError, ObjetIndisponibleError
@@ -20,7 +19,7 @@ from ui.affichage import Affichage
 
 
 def un_dresseur(nom, numeros):
-    iv = Statistiques.identiques(31)
+    iv = Statistiques(31)
     pokemons = []
     for numero in numeros:
         pokemons.append(Catalogue.pokemon(numero, 50, iv))
@@ -84,21 +83,29 @@ class TestObjets(unittest.TestCase):
         self.assertIsNone(self.dracaufeu.objet_tenu)
 
 
+def un_combat():
+    """Un combat tout prêt (le calcul des dégâts est une méthode de Combat)."""
+    return Combat(un_dresseur("A", [0, 2, 4]), un_dresseur("B", [3, 5, 1]),
+                  Affichage(delai=0, delai_lettre=0), None)
+
+
 class TestDegats(unittest.TestCase):
     def test_formule_de_base(self):
+        combat = un_combat()
+
         # ((2 x 50 / 5 + 2) x 100 x 100 / 100) / 50 + 2 = 46
-        self.assertEqual(CalculDegats.formule_de_base(50, 100, 100, 100, False), 46)
-        self.assertEqual(CalculDegats.formule_de_base(50, 100, 100, 100, True), 24)
+        self.assertEqual(combat.formule_de_base(50, 100, 100, 100, False), 46)
+        self.assertEqual(combat.formule_de_base(50, 100, 100, 100, True), 24)
 
     def test_immunite_et_super_efficace(self):
-        iv = Statistiques.identiques(31)
+        iv = Statistiques(31)
         raichu = Catalogue.pokemon(2, 50, iv)
         laggron = Catalogue.pokemon(3, 50, iv)
         tyranocif = Catalogue.pokemon(5, 50, iv)
         dracaufeu = Catalogue.pokemon(0, 50, iv)
 
-        sans_effet = CalculDegats.calculer(raichu, laggron, Catalogue.attaque("Tonnerre"))
-        quadruple = CalculDegats.calculer(tyranocif, dracaufeu, Catalogue.attaque("Éboulement"))
+        sans_effet = un_combat().calculer_degats(raichu, laggron, Catalogue.attaque("Tonnerre"))
+        quadruple = un_combat().calculer_degats(tyranocif, dracaufeu, Catalogue.attaque("Éboulement"))
 
         self.assertEqual(sans_effet.degats, 0)
         self.assertEqual(quadruple.efficacite, 4.0)
@@ -146,7 +153,7 @@ class TestCombat(unittest.TestCase):
         random.seed(graine)
         self.alice = un_dresseur("Alice", [0, 2, 4])
         self.bob = un_dresseur("Bob", [3, 5, 1])
-        combat = Combat(self.alice, self.bob, Affichage(delai=0), menus)
+        combat = Combat(self.alice, self.bob, Affichage(delai=0, delai_lettre=0), menus)
 
         with contextlib.redirect_stdout(io.StringIO()):
             return combat.lancer()
@@ -175,7 +182,7 @@ class TestCombat(unittest.TestCase):
 
         action = ActionAttaque(alice, Catalogue.attaque("Surf"))
 
-        self.assertEqual(action.executer(bob), [])
+        self.assertEqual(action.executer(bob, un_combat()), [])
 
     def test_lutte_sans_pp(self):
         alice = un_dresseur("Alice", [0, 2, 4])
@@ -186,7 +193,7 @@ class TestCombat(unittest.TestCase):
 
         random.seed(1)
         action = ActionAttaque(alice, Catalogue.attaque_lutte())
-        messages = action.executer(bob)
+        messages = action.executer(bob, un_combat())
 
         self.assertIn("Lutte", " ".join(messages))
         self.assertIn("contrecoup", " ".join(messages))

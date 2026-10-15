@@ -1,5 +1,6 @@
-"""Point d'entrée : on crée un Jeu et on le lance. Toute la logique est dans jeu.py.
-Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
+"""Point d'entrée : je crée un Jeu et je le lance, rien d'autre (le prof demande qu'il n'y ait
+pas de logique dans le main).
+S'il y a un @ que l'on ne connaît pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
 from jeu import Jeu

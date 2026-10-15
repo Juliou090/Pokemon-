@@ -1,5 +1,9 @@
-"""Le dresseur et ce qu'il possède : une équipe de Pokémon et un sac d'objets.
-Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
+"""Le dresseur et ce qu'il possède : une équipe de Pokémon (Equipe) et un sac d'objets (Sac).
+
+J'ai mis ces classes dans le même fichier parce qu'elles vont toujours ensemble.
+Equipe.TAILLE est un attribut de classe : pour passer à 6 Pokémon par équipe, je n'ai
+que ce nombre à changer.
+S'il y a un @ que l'on ne connaît pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
 from exceptions import (

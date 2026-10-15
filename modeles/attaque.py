@@ -1,12 +1,16 @@
 """Une attaque, et ses effets (statut ou modification de stat).
-Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
+
+J'ai séparé les effets (EffetStatut : infliger un statut, EffetStat : monter ou baisser une
+stat) de l'attaque elle-même. Une attaque a une LISTE d'effets, ce qui permet d'en combiner
+plusieurs (par exemple Plénitude monte deux stats). Chaque effet a sa méthode appliquer().
+S'il y a un @ que l'on ne connaît pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
 import random
 
 from exceptions import ActionInvalideError
 from modeles.statistiques import Statistiques
-from modeles.statuts import creer_statut
+from modeles.statuts import Brulure, Gel, Paralysie, Poison, Sommeil
 
 
 class EffetStatut:
@@ -16,6 +20,23 @@ class EffetStatut:
         self.identifiant_statut = identifiant_statut
         self.chance = chance
 
+    def nouveau_statut(self):
+        """Fabrique un statut NEUF : chaque Pokémon touché doit avoir le sien (à cause
+        du compteur du sommeil)."""
+        if self.identifiant_statut == "poison":
+            return Poison()
+
+        if self.identifiant_statut == "brulure":
+            return Brulure()
+
+        if self.identifiant_statut == "paralysie":
+            return Paralysie()
+
+        if self.identifiant_statut == "sommeil":
+            return Sommeil()
+
+        return Gel()
+
     def appliquer(self, lanceur, cible):
         """Renvoie la phrase à afficher, ou "" s'il ne s'est rien passé."""
         if cible.est_ko():
@@ -24,7 +45,7 @@ class EffetStatut:
         if random.randint(1, 100) > self.chance:
             return ""
 
-        statut = creer_statut(self.identifiant_statut)
+        statut = self.nouveau_statut()
 
         if cible.appliquer_statut(statut):
             return cible.nom + " est " + statut.nom + " !"

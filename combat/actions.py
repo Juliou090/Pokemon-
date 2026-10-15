@@ -1,13 +1,13 @@
-"""Les quatre actions possibles à chaque tour : attaquer, changer de Pokémon,
-utiliser un objet, abandonner.
+"""Les quatre actions possibles à chaque tour : attaquer, changer de Pokémon, utiliser un
+objet, abandonner.
 
-Choix : une classe Action « de base » et une classe fille par action. Chacune
-a sa méthode executer(), qui renvoie la liste des phrases à afficher. Le combat
-appelle action.executer() sans savoir de quelle action il s'agit.
-Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
+J'ai fait une classe Action « de base » et une classe fille par action, chacune avec sa
+méthode executer() qui renvoie les phrases à afficher. Comme ça, le combat appelle toujours
+action.executer() sans avoir besoin de savoir de quelle action il s'agit : c'est le
+polymorphisme.
+S'il y a un @ que l'on ne connaît pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
-from combat.calcul_degats import CalculDegats
 from exceptions import ActionInvalideError, ObjetIndisponibleError, PokemonKOError
 
 
@@ -22,7 +22,9 @@ class Action:
         """Vitesse du Pokémon actif : elle départage deux actions de même priorité."""
         return self.acteur.pokemon_actif().stat_effective("vitesse")
 
-    def executer(self, adversaire):
+    def executer(self, adversaire, combat):
+        """adversaire = le Dresseur d'en face ; combat = le Combat en cours (c'est lui
+        qui sait calculer les dégâts). Renvoie la liste des phrases à afficher."""
         return []
 
 
@@ -32,7 +34,7 @@ class ActionAttaque(Action):
         self.attaque = attaque
         self.priorite = attaque.priorite
 
-    def executer(self, adversaire):
+    def executer(self, adversaire, combat):
         messages = []
         attaquant = self.acteur.pokemon_actif()
         defenseur = adversaire.pokemon_actif()
@@ -66,12 +68,12 @@ class ActionAttaque(Action):
         messages.append("[" + self.acteur.nom + "] " + attaquant.nom
                         + " utilise " + self.attaque.nom + " !")
 
-        if not CalculDegats.touche(self.attaque):
+        if not combat.touche(self.attaque):
             messages.append("L'attaque de " + attaquant.nom + " rate !")
         elif self.attaque.est_de_statut():
             self._attaque_de_statut(attaquant, defenseur, messages)
         else:
-            self._attaque_qui_blesse(attaquant, defenseur, messages)
+            self._attaque_qui_blesse(attaquant, defenseur, messages, combat)
 
         return messages
 
@@ -89,8 +91,8 @@ class ActionAttaque(Action):
         if not un_effet_a_marche:
             messages.append("Mais ça échoue !")
 
-    def _attaque_qui_blesse(self, attaquant, defenseur, messages):
-        resultat = CalculDegats.calculer(attaquant, defenseur, self.attaque)
+    def _attaque_qui_blesse(self, attaquant, defenseur, messages, combat):
+        resultat = combat.calculer_degats(attaquant, defenseur, self.attaque)
 
         if resultat.efficacite == 0.0:
             messages.append("Ça n'affecte pas " + defenseur.nom + "...")
@@ -143,7 +145,7 @@ class ActionChangement(Action):
         super().__init__(acteur)
         self.indice = indice
 
-    def executer(self, adversaire):
+    def executer(self, adversaire, combat):
         ancien = self.acteur.pokemon_actif()
 
         try:
@@ -162,7 +164,7 @@ class ActionObjet(Action):
         self.nom_objet = nom_objet
         self.indice_cible = indice_cible
 
-    def executer(self, adversaire):
+    def executer(self, adversaire, combat):
         cible = self.acteur.equipe.pokemons[self.indice_cible]
 
         try:
@@ -179,7 +181,7 @@ class ActionObjet(Action):
 class ActionAbandon(Action):
     priorite = 10
 
-    def executer(self, adversaire):
+    def executer(self, adversaire, combat):
         self.acteur.a_abandonne = True
 
         return [self.acteur.nom + " abandonne le combat !"]

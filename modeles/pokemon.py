@@ -4,8 +4,10 @@ Encapsulation : les PV sont privés (_pv). On les lit avec get_pv() et on les
 change avec set_pv(), qui vérifie que la valeur est cohérente. Les autres
 informations (nom, types...) ne risquent rien : je les laisse publiques pour
 ne pas écrire des dizaines de méthodes inutiles.
-Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
+S'il y a un @ que l'on ne connaît pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
+
+import random
 
 from exceptions import (
     ActionInvalideError,
@@ -41,12 +43,14 @@ class Pokemon:
             nature = Nature("Sérieux", None, None)
 
         if iv is None:
-            iv = Statistiques.aleatoires()
+            iv = Statistiques(random.randint(0, 31), random.randint(0, 31),
+                              random.randint(0, 31), random.randint(0, 31),
+                              random.randint(0, 31), random.randint(0, 31))
 
         self.nature = nature
         self.iv = iv
-        self.stats = Statistiques.calculer(stats_base, iv, Statistiques.identiques(0),
-                                           niveau, nature)
+        # Les stats de base calculent les stats finales (EV tous à 0).
+        self.stats = stats_base.calculer(iv, Statistiques(0), niveau, nature)
         self.pv_max = self.stats.pv
 
         # Les paliers de stats de combat (de -6 à +6), remis à 0 quand on sort.

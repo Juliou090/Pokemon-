@@ -3,7 +3,7 @@
 Choix : au lieu d'un grand tableau 14 x 14, chaque type connaît lui-même les
 types qu'il bat, ceux qui lui résistent et ceux qui l'annulent. C'est plus
 court, et le type répond tout seul à « suis-je efficace contre celui-là ? ».
-Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
+S'il y a un @ que l'on ne connaît pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
 

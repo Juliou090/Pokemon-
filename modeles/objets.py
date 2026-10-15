@@ -5,7 +5,7 @@ redéfinit verifier() (« est-ce que ça sert à quelque chose ? ») et utiliser
 (« je l'applique »). Le combat appelle objet.utiliser(cible) sans savoir si
 c'est une potion ou un rappel. Pour avoir « Potion », « Super Potion »... je
 n'ai pas fait une classe par potion : un Soin reçoit simplement ses PV.
-Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
+S'il y a un @ que l'on ne connaît pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
 from exceptions import ActionInvalideError

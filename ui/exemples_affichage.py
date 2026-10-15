@@ -1,25 +1,18 @@
-"""Exemples d'affichage : une boîte à outils pour faire un bel affichage console.
+"""Ma boîte à outils d'affichage : couleurs, cadres, barres de PV, Poké Ball.
 
-Ce fichier sert de DOCUMENTATION VIVANTE : chaque outil est expliqué, et on
-peut le copier ou l'appeler tel quel dans le vrai affichage du jeu.
+J'ai mis ici tout ce qui sert à faire un bel affichage dans la console. La classe
+Affichage (affichage.py) en hérite : elle peut donc appeler directement
+self.colorer(...), self.cadre(...), self.barre_de_vie(...), etc.
+Pour voir tous les exemples à l'écran : python -m ui.exemples_affichage
 
-    from ui.exemples_affichage import OutilsAffichage, Couleurs
-
-Pour voir tous les exemples à l'écran, lance simplement le fichier :
-
-    python -m ui.exemples_affichage
-
-On a le droit ici : print (c'est le dossier ui/), couleurs, cadres, barres.
-On N'A PAS le droit : de calculer des dégâts ou de connaître les règles du jeu.
-
-Comment ça marche, en résumé :
-- Un « print » écrit UNE ligne. Pour un affichage sur plusieurs lignes, on
-  fait plusieurs print (souvent dans une boucle for).
-- Les couleurs sont des codes spéciaux (invisibles) écrits avant le texte : le
-  terminal les comprend comme « colore ce qui suit ».
-- Les cadres, les barres et la Poké Ball sont fabriqués avec des caractères
+Comment ça marche :
+- un print écrit UNE ligne : pour un affichage sur plusieurs lignes, je fais
+  plusieurs print (souvent dans une boucle for) ;
+- une couleur est un code spécial, invisible, écrit avant le texte : le terminal
+  le comprend comme « colore ce qui suit » ;
+- les cadres, les barres et la Poké Ball sont fabriqués avec des caractères
   ordinaires (─ │ █ ░...) répétés avec l'opérateur * (ex. "─" * 10).
-Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
+S'il y a un @ que l'on ne connaît pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
 import math
@@ -47,36 +40,32 @@ class Couleurs:
 class OutilsAffichage:
     """Des outils pour construire de beaux affichages.
 
-    Toutes les méthodes sont des @staticmethod : elles n'ont besoin d'aucun
-    objet (pas de self). On les appelle directement avec le nom de la classe :
-        OutilsAffichage.colorer("Bonjour", Couleurs.VERT)
+    Un objet OutilsAffichage retient la largeur de l'écran (self.largeur) :
+    les cadres, les titres et la Poké Ball s'y adaptent tout seuls.
     """
+
+    def __init__(self, largeur=72):
+        self.largeur = largeur
 
     # ------------------------------------------------------------------
     # 1. Les couleurs
     # ------------------------------------------------------------------
-    @staticmethod
-    def colorer(texte, couleur):
+    def colorer(self, texte, couleur):
         """Renvoie le texte coloré (le code de couleur avant, le RESET après).
 
         Sans le RESET, tout ce qui s'affiche ensuite resterait coloré.
-
-        Exemple :
-            print(OutilsAffichage.colorer("Attention", Couleurs.ROUGE))
+        Exemple : print(self.colorer("Attention", Couleurs.ROUGE))
         """
         return couleur + texte + Couleurs.RESET
 
     # ------------------------------------------------------------------
     # 2. Aligner du texte coloré
     # ------------------------------------------------------------------
-    @staticmethod
-    def longueur_visible(texte):
-        """Renvoie la longueur du texte SANS compter les codes de couleur.
+    def longueur_visible(self, texte):
+        """Longueur du texte SANS compter les codes de couleur (invisibles).
 
-        Pourquoi : les codes de couleur sont invisibles à l'écran, mais len() les
-        compte. Pour aligner des cadres, il faut la longueur que l'on VOIT.
-
-        Un code de couleur commence par le caractère \\033 et se termine par « m ».
+        len() les compte, ce qui décalerait les cadres. Un code de couleur
+        commence par \\033 et se termine par « m ».
         """
         longueur = 0
         dans_un_code = False
@@ -92,10 +81,9 @@ class OutilsAffichage:
 
         return longueur
 
-    @staticmethod
-    def completer(texte, largeur):
+    def completer(self, texte, largeur):
         """Ajoute des espaces à droite pour que le texte occupe `largeur` caractères."""
-        manque = largeur - OutilsAffichage.longueur_visible(texte)
+        manque = largeur - self.longueur_visible(texte)
 
         if manque <= 0:
             return texte
@@ -103,60 +91,53 @@ class OutilsAffichage:
         return texte + " " * manque
 
     # ------------------------------------------------------------------
-    # 3. Les cadres
+    # 3. Les cadres et les titres
     # ------------------------------------------------------------------
-    @staticmethod
-    def cadre(lignes, largeur=50, couleur=Couleurs.GRIS, titre=""):
+    def cadre(self, lignes, couleur=Couleurs.GRIS, titre=""):
         """Renvoie une LISTE de lignes qui forment un cadre autour des `lignes` données.
 
         Pour l'afficher :
-            for ligne in OutilsAffichage.cadre(["Dracaufeu", "PV 120/153"]):
+            for ligne in self.cadre(["Dracaufeu", "PV 120/153"]):
                 print(ligne)
-
-        Les coins arrondis et les traits sont des caractères comme les autres.
         """
         resultat = []
-        largeur_interieure = largeur - 4
+        largeur_interieure = self.largeur - 4
 
         # Ligne du haut : coin, trait répété, (titre), coin.
         if titre == "":
-            haut = "╭" + "─" * (largeur - 2) + "╮"
-            resultat.append(OutilsAffichage.colorer(haut, couleur))
+            haut = "╭" + "─" * (self.largeur - 2) + "╮"
+            resultat.append(self.colorer(haut, couleur))
         else:
-            reste = largeur - OutilsAffichage.longueur_visible(titre) - 5
-            debut = OutilsAffichage.colorer("╭─ ", couleur)
-            fin = OutilsAffichage.colorer(" " + "─" * reste + "╮", couleur)
+            reste = self.largeur - self.longueur_visible(titre) - 5
+            debut = self.colorer("╭─ ", couleur)
+            fin = self.colorer(" " + "─" * reste + "╮", couleur)
             resultat.append(debut + titre + fin)
 
         # Une ligne par texte : barre | espace | texte complété | espace | barre.
-        barre = OutilsAffichage.colorer("│", couleur)
+        barre = self.colorer("│", couleur)
         for ligne in lignes:
-            contenu = OutilsAffichage.completer(ligne, largeur_interieure)
+            contenu = self.completer(ligne, largeur_interieure)
             resultat.append(barre + " " + contenu + " " + barre)
 
-        # Ligne du bas.
-        bas = "╰" + "─" * (largeur - 2) + "╯"
-        resultat.append(OutilsAffichage.colorer(bas, couleur))
+        bas = "╰" + "─" * (self.largeur - 2) + "╯"
+        resultat.append(self.colorer(bas, couleur))
 
         return resultat
 
-    @staticmethod
-    def titre_centre(texte, largeur=50, couleur=Couleurs.CYAN):
+    def titre_centre(self, texte, couleur=Couleurs.CYAN):
         """Renvoie un titre centré entre des traits (ex. ══════  TOUR 1  ══════)."""
         ligne = "══════  " + texte + "  ══════"
-        marge = " " * ((largeur - len(ligne)) // 2)
+        marge = " " * ((self.largeur - len(ligne)) // 2)
 
-        return marge + OutilsAffichage.colorer(ligne, couleur)
+        return marge + self.colorer(ligne, couleur)
 
     # ------------------------------------------------------------------
     # 4. La barre de PV
     # ------------------------------------------------------------------
-    @staticmethod
-    def barre_de_vie(pv, pv_max, taille=20):
+    def barre_de_vie(self, pv, pv_max, taille=20):
         """Renvoie une barre de PV : des cases pleines (couleur) et des cases vides (gris).
 
         Exemple : pv=60, pv_max=100, taille=10  ->  ██████░░░░ (6 cases pleines).
-
         Couleur : verte au-dessus de 50 %, jaune au-dessus de 20 %, rouge sinon.
         """
         # Le // garde la partie entière : 60 * 10 // 100 = 6 cases.
@@ -175,22 +156,20 @@ class OutilsAffichage:
         else:
             couleur = Couleurs.ROUGE
 
-        partie_pleine = OutilsAffichage.colorer("█" * cases_pleines, couleur)
-        partie_vide = OutilsAffichage.colorer("░" * (taille - cases_pleines),
-                                              Couleurs.GRIS)
+        partie_pleine = self.colorer("█" * cases_pleines, couleur)
+        partie_vide = self.colorer("░" * (taille - cases_pleines), Couleurs.GRIS)
 
         return partie_pleine + partie_vide
 
     # ------------------------------------------------------------------
     # 5. La Poké Ball
     # ------------------------------------------------------------------
-    @staticmethod
-    def pokeball(largeur=50):
+    def pokeball(self):
         """Renvoie une LISTE de lignes qui dessinent une Poké Ball.
 
         Principe : un cercle se dessine ligne par ligne. On mesure sa largeur
-        au MILIEU de chaque ligne, ce qui évite les lignes vides en haut et en
-        bas. La largeur vient du théorème de Pythagore : racine(rayon² - y²).
+        au MILIEU de chaque ligne ; elle vient du théorème de Pythagore :
+        racine(rayon² - y²).
         """
         resultat = []
         rayon = 6        # taille de la balle : plus grand = plus de lignes
@@ -199,20 +178,18 @@ class OutilsAffichage:
         for ligne in range(-rayon, rayon):
             y = ligne + 0.5
             demi_largeur = int(facteur * math.sqrt(rayon * rayon - y * y) + 0.5)
-            marge = " " * ((largeur - 2 * demi_largeur) // 2)
+            marge = " " * ((self.largeur - 2 * demi_largeur) // 2)
 
             if ligne < -1:
-                texte = OutilsAffichage.colorer("█" * (2 * demi_largeur),
-                                                Couleurs.ROUGE)
+                texte = self.colorer("█" * (2 * demi_largeur), Couleurs.ROUGE)
             elif ligne > 0:
-                texte = OutilsAffichage.colorer("█" * (2 * demi_largeur),
-                                                Couleurs.BLANC)
+                texte = self.colorer("█" * (2 * demi_largeur), Couleurs.BLANC)
             else:
                 # Les 2 lignes du milieu : bande grise, bouton blanc au centre.
                 cote = demi_largeur - 3
-                bande_gauche = OutilsAffichage.colorer("█" * cote, Couleurs.GRIS)
-                bouton = OutilsAffichage.colorer("█" * 6, Couleurs.BLANC)
-                bande_droite = OutilsAffichage.colorer("█" * cote, Couleurs.GRIS)
+                bande_gauche = self.colorer("█" * cote, Couleurs.GRIS)
+                bouton = self.colorer("█" * 6, Couleurs.BLANC)
+                bande_droite = self.colorer("█" * cote, Couleurs.GRIS)
                 texte = bande_gauche + bouton + bande_droite
 
             resultat.append(marge + texte)
@@ -222,50 +199,43 @@ class OutilsAffichage:
     # ------------------------------------------------------------------
     # 6. Divers
     # ------------------------------------------------------------------
-    @staticmethod
-    def effacer_ecran():
+    def effacer_ecran(self):
         """Efface l'écran du terminal (pour cacher ce qui précède)."""
         print("\033[2J\033[3J\033[H", end="")
 
+    def demonstration(self):
+        """Affiche un exemple de chaque outil. Lancer : python -m ui.exemples_affichage"""
+        print()
+        print("1. Couleurs :")
+        print("   " + self.colorer("texte rouge", Couleurs.ROUGE))
+        print("   " + self.colorer("texte vert", Couleurs.VERT))
+        print("   " + self.colorer("texte jaune", Couleurs.JAUNE))
+        print("   " + self.colorer("texte bleu", Couleurs.BLEU))
 
-def demonstration():
-    """Affiche un exemple de chaque outil. Lancer : python -m ui.exemples_affichage"""
-    print()
-    print("1. Couleurs :")
-    print("   " + OutilsAffichage.colorer("texte rouge", Couleurs.ROUGE))
-    print("   " + OutilsAffichage.colorer("texte vert", Couleurs.VERT))
-    print("   " + OutilsAffichage.colorer("texte jaune", Couleurs.JAUNE))
-    print("   " + OutilsAffichage.colorer("texte bleu", Couleurs.BLEU))
-    print("   " + OutilsAffichage.colorer("texte orange", Couleurs.ORANGE))
-    print("   " + OutilsAffichage.colorer("texte gris", Couleurs.GRIS))
+        print()
+        print("2. Un titre centré :")
+        print(self.titre_centre("TOUR 1"))
 
-    print()
-    print("2. Un titre centré :")
-    print(OutilsAffichage.titre_centre("TOUR 1"))
+        print()
+        print("3. Un cadre avec une barre de PV :")
+        lignes = [
+            self.colorer("Dracaufeu", Couleurs.GRAS) + "  Niv.50  "
+            + self.colorer("[Feu]", Couleurs.ORANGE) + " " + self.colorer("[Vol]", Couleurs.BLEU),
+            "PV " + self.barre_de_vie(120, 153, 24) + " 120/153",
+        ]
+        for ligne in self.cadre(lignes, Couleurs.CYAN, "Sacha  ● ● ●"):
+            print(ligne)
 
-    print()
-    print("3. Un cadre avec une barre de PV et un statut :")
-    lignes = [
-        OutilsAffichage.colorer("Dracaufeu", Couleurs.GRAS) + "  Niv.50  "
-        + OutilsAffichage.colorer("[Feu]", Couleurs.ORANGE) + " "
-        + OutilsAffichage.colorer("[Vol]", Couleurs.BLEU) + "  "
-        + OutilsAffichage.colorer("[PAR]", Couleurs.JAUNE),
-        "PV " + OutilsAffichage.barre_de_vie(120, 153, 24) + " 120/153",
-    ]
-    for ligne in OutilsAffichage.cadre(lignes, 50, Couleurs.CYAN, "Sacha  ● ● ●"):
-        print(ligne)
+        print()
+        print("4. Les barres de PV selon la vie restante :")
+        for pv in [100, 60, 30, 10, 1, 0]:
+            print("   " + self.barre_de_vie(pv, 100, 20) + " " + str(pv) + "/100")
 
-    print()
-    print("4. Les barres de PV selon la vie restante :")
-    for pv in [100, 60, 30, 10, 1, 0]:
-        print("   " + OutilsAffichage.barre_de_vie(pv, 100, 20) + " " + str(pv) + "/100")
-
-    print()
-    print("5. La Poké Ball :")
-    for ligne in OutilsAffichage.pokeball(50):
-        print(ligne)
-    print()
+        print()
+        print("5. La Poké Ball :")
+        for ligne in self.pokeball():
+            print(ligne)
 
 
 if __name__ == "__main__":
-    demonstration()
+    OutilsAffichage().demonstration()

@@ -1,10 +1,10 @@
 """Les 5 statuts majeurs (règles de la génération 3, Bulbapedia).
 
-Choix : une classe « de base » StatutMajeur qui ne fait rien, et une classe par
-statut qui redéfinit seulement ce qui change. Le combat appelle toujours les
-mêmes méthodes (peut_agir, degats_fin_de_tour...) sans savoir de quel statut
-il s'agit : c'est le polymorphisme.
-Si tu vois un @ que tu ne connais pas : tout est expliqué dans GUIDE_PYTHON.md.
+J'ai fait une classe de base StatutMajeur qui ne fait rien, et une classe par statut qui
+redéfinit seulement ce qui change. Le combat appelle toujours les mêmes méthodes (peut_agir,
+degats_fin_de_tour...) sans savoir de quel statut il s'agit : c'est le polymorphisme.
+Les statuts sont dans modeles/ parce qu'un Pokémon POSSÈDE un statut.
+S'il y a un @ que l'on ne connaît pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
 import random
@@ -143,21 +143,3 @@ class Gel(StatutMajeur):
 
         self.message = pokemon.nom + " est gelé : il ne peut pas bouger !"
         return False
-
-
-def creer_statut(identifiant):
-    """Fabrique un statut NEUF à partir de son identifiant (chaque Pokémon touché
-    doit avoir le sien, à cause du compteur du sommeil)."""
-    if identifiant == "poison":
-        return Poison()
-
-    if identifiant == "brulure":
-        return Brulure()
-
-    if identifiant == "paralysie":
-        return Paralysie()
-
-    if identifiant == "sommeil":
-        return Sommeil()
-
-    return Gel()
