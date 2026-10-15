@@ -26,7 +26,7 @@ class Audio:
     # D'où viennent les musiques (pour les crédits, le programme ne s'en sert pas).
     LIENS_MUSIQUE = {"menu": "", "combat": ""}
 
-    VOLUME_NORMAL = 0.55    # de 0 à 1
+    VOLUME_NORMAL = 0.01    # de 0 à 1
     VOLUME_DISCRET = 0.2    # pendant le déroulement d'un tour, pour entendre les bruitages
 
     def __init__(self, actif=True):
