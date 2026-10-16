@@ -43,9 +43,14 @@ class TestAudio(unittest.TestCase):
                 self.assertGreater(fichier.getnframes(), 0)
 
     def test_les_musiques_existent(self):
-        for nom in Audio.FICHIERS_MUSIQUE:
-            base = os.path.join(self.audio.dossier, Audio.FICHIERS_MUSIQUE[nom])
-            self.assertTrue(os.path.exists(base + ".mp3") or os.path.exists(base + ".wav"), nom)
+        for musique in self.audio.musiques:
+            self.assertNotEqual(musique.chemin(self.audio.dossier), "", musique.nom)
+
+    def test_volume_des_bruitages(self):
+        self.assertEqual(self.audio._trouver_bruitage("clic").volume, 0.1)
+        # Un bruitage qui n'est pas dans la liste est créé à volume 1, puis rangé.
+        self.assertEqual(self.audio._trouver_bruitage("soin").volume, 1.0)
+        self.assertIs(self.audio._trouver_bruitage("soin"), self.audio._trouver_bruitage("soin"))
 
 
 if __name__ == "__main__":

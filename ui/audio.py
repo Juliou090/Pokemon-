@@ -12,6 +12,9 @@ Ce que ça fait : pygame.mixer lit les MP3 et les WAV, règle le volume et fait 
 faut l'installer une fois (pip install pygame, ou pygame-ce avec Python 3.14). S'il n'est pas
 installé, ou s'il n'y a pas de carte son, le jeu écrit un message au lancement et se joue
 en silence.
+
+Trois classes : Musique et Bruitage (un objet par son, avec son volume) et Audio (le chef
+d'orchestre, qui joue les sons).
 S'il y a un @ que l'on ne connaît pas : tout est expliqué dans GUIDE_PYTHON.md.
 """
 
@@ -19,22 +22,50 @@ import os
 import time
 
 
+class Musique:
+    """Une musique du jeu : son nom, son fichier (sans l'extension) et d'où elle vient."""
+
+    def __init__(self, nom, fichier, lien=""):
+        self.nom = nom
+        self.fichier = fichier
+        self.lien = lien    # pour les crédits : le programme ne s'en sert pas
+
+    def chemin(self, dossier):
+        """Chemin complet du fichier (.mp3 ou .wav), ou "" si le fichier n'existe pas."""
+        base = os.path.join(dossier, self.fichier)
+
+        for extension in [".mp3", ".wav"]:
+            if os.path.exists(base + extension):
+                return base + extension
+
+        return ""
+
+
+class Bruitage:
+    """Un bruitage : son nom (celui du fichier audio/sons/<nom>.wav) et son volume (0 à 1)."""
+
+    def __init__(self, nom, volume=1.0):
+        self.nom = nom
+        self.volume = volume
+        self.son = None      # chargé au premier coup, pour ne pas relire le fichier ensuite
+
+    def jouer(self, pygame, dossier):
+        """Joue le bruitage sans bloquer le jeu, par-dessus la musique."""
+        if self.son is None:
+            chemin = os.path.join(dossier, "audio", "sons", self.nom + ".wav")
+
+            if not os.path.exists(chemin):
+                return
+
+            self.son = pygame.mixer.Sound(chemin)
+            self.son.set_volume(self.volume)
+
+        self.son.play()
+
+
 class Audio:
-    # Mes musiques : fichiers du dossier audio/ (.mp3 ou .wav), sans l'extension.
-    FICHIERS_MUSIQUE = {"menu": "audio/Pokemon", "combat": "audio/P2"}
-
-    # D'où viennent les musiques (pour les crédits, le programme ne s'en sert pas).
-    LIENS_MUSIQUE = {"menu": "", "combat": ""}
-
-    VOLUME_NORMAL = 0.01    # de 0 à 1
-    VOLUME_DISCRET = 0.005    # pendant le déroulement d'un tour, pour entendre les bruitages
-    VOLUMES_BRUITAGES = {
-        "clic": 0.1,
-        "retour": 0.1,
-        "critique": 0.1,
-        "super_efficace": 0.2,
-        "ko": 0.2,
-    }
+    VOLUME_NORMAL = 0.01                  # volume de la musique, de 0 à 1
+    VOLUME_DISCRET = VOLUME_NORMAL / 2    # pendant un tour, pour entendre les bruitages
 
     def __init__(self, actif=True):
         """actif=False : jeu muet (tests). On peut aussi couper avec JEU_SANS_SON=1."""
@@ -42,7 +73,22 @@ class Audio:
         self.message = ""            # pourquoi il n'y a pas de son (affiché au lancement)
         self.musique_en_cours = ""
         self.dossier = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.bruitages = {}          # les sons déjà chargés, pour ne pas les relire
+
+        # Mes musiques : fichiers du dossier audio/ (.mp3 ou .wav).
+        self.musiques = [
+            Musique("menu", "audio/Pokemon"),
+            Musique("combat", "audio/P2"),
+        ]
+
+        # Les bruitages dont je change le volume (les autres sont joués à 1, voir
+        # _trouver_bruitage).
+        self.bruitages = [
+            Bruitage("clic", 0.1),
+            Bruitage("retour", 0.1),
+            Bruitage("critique", 0.3),
+            Bruitage("super_efficace", 0.4),
+            Bruitage("ko", 0.4),
+        ]
 
         if not actif or os.environ.get("JEU_SANS_SON") == "1":
             return
@@ -60,6 +106,14 @@ class Audio:
             self.message = "Pas de son : aucune sortie audio détectée. Le jeu marche sans."
 
     # --- La musique -----------------------------------------------------------
+    def _trouver_musique(self, nom):
+        """La Musique qui porte ce nom (None si elle n'existe pas)."""
+        for musique in self.musiques:
+            if musique.nom == nom:
+                return musique
+
+        return None
+
     def _regler_volume(self, volume, duree):
         """Change le volume en douceur, en `duree` secondes."""
         depart = self.pygame.mixer.music.get_volume()
@@ -73,19 +127,33 @@ class Audio:
         if not self.actif or nom == self.musique_en_cours:
             return
 
-        base = os.path.join(self.dossier, Audio.FICHIERS_MUSIQUE[nom])
+        musique = self._trouver_musique(nom)
 
-        for extension in [".mp3", ".wav"]:
-            if os.path.exists(base + extension):
-                if self.musique_en_cours != "":
-                    self._regler_volume(0, 0.4)
+        if musique is None:
+            return
 
-                self.pygame.mixer.music.load(base + extension)
-                self.pygame.mixer.music.set_volume(0)
-                self.pygame.mixer.music.play(-1)       # -1 : en boucle
-                self._regler_volume(Audio.VOLUME_NORMAL, 1.0)
-                self.musique_en_cours = nom
-                return
+        chemin = musique.chemin(self.dossier)
+
+        if chemin == "":
+            return
+
+        if self.musique_en_cours != "":
+            self._regler_volume(0, 0.4)
+
+        self.pygame.mixer.music.load(chemin)
+
+        if self.musique_en_cours == "":
+            # Première musique du jeu : je la lance directement au bon volume,
+            # sinon le début (déjà inaudible pendant le fondu) serait perdu.
+            self.pygame.mixer.music.set_volume(Audio.VOLUME_NORMAL)
+            self.pygame.mixer.music.play(-1)       # -1 : en boucle
+        else:
+            # Changement de musique : fondu, la nouvelle monte progressivement.
+            self.pygame.mixer.music.set_volume(0)
+            self.pygame.mixer.music.play(-1)
+            self._regler_volume(Audio.VOLUME_NORMAL, 1.0)
+
+        self.musique_en_cours = nom
 
     def discrete(self):
         if self.musique_en_cours != "":
@@ -102,18 +170,24 @@ class Audio:
             self.actif = False
 
     # --- Les bruitages --------------------------------------------------------
-    def bruitage(self, nom):
-        """Joue audio/sons/<nom>.wav (sans bloquer le jeu, par-dessus la musique)."""
-        chemin = os.path.join(self.dossier, "audio", "sons", nom + ".wav")
+    def _trouver_bruitage(self, nom):
+        """Le Bruitage qui porte ce nom. S'il n'est pas dans la liste, je le crée à
+        volume 1 et je le range dans la liste pour ne pas le recharger."""
+        for bruitage in self.bruitages:
+            if bruitage.nom == nom:
+                return bruitage
 
-        if not self.actif or not os.path.exists(chemin):
+        nouveau = Bruitage(nom)
+        self.bruitages.append(nouveau)
+
+        return nouveau
+
+    def bruitage(self, nom):
+        """Joue le bruitage de ce nom (audio/sons/<nom>.wav)."""
+        if not self.actif:
             return
 
-        if nom not in self.bruitages:
-            self.bruitages[nom] = self.pygame.mixer.Sound(chemin)
-            self.bruitages[nom].set_volume(Audio.VOLUMES_BRUITAGES.get(nom, 1.0))
-
-        self.bruitages[nom].play()
+        self._trouver_bruitage(nom).jouer(self.pygame, self.dossier)
 
     def nom_du_bruitage(self, texte):
         """Le bruitage qui correspond à une phrase du combat ("" = aucun)."""
